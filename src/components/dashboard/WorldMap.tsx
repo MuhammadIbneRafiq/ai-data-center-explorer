@@ -7,21 +7,29 @@ interface WorldMapProps {
   data: CountryData[];
   selectedMetric: string;
   onCountryClick?: (country: CountryData) => void;
+  activeCountry?: CountryData | null;
 }
 
-export const WorldMap = ({ data, selectedMetric, onCountryClick }: WorldMapProps) => {
+export const WorldMap = ({ data, selectedMetric, onCountryClick, activeCountry }: WorldMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.CircleMarker[]>([]);
 
-  const getColorForScore = (score: number | undefined): string => {
-    if (!score) return "hsl(var(--muted))";
-    
-    if (score >= 80) return "hsl(var(--region-excellent))";
-    if (score >= 60) return "hsl(var(--region-good))";
-    if (score >= 40) return "hsl(var(--region-moderate))";
-    if (score >= 20) return "hsl(var(--region-poor))";
+  const getColorForLevel = (level: number | undefined): string => {
+    if (level === undefined || Number.isNaN(level)) return "hsl(var(--muted))";
+
+    if (level >= 80) return "hsl(var(--region-excellent))";
+    if (level >= 60) return "hsl(var(--region-good))";
+    if (level >= 40) return "hsl(var(--region-moderate))";
+    if (level >= 20) return "hsl(var(--region-poor))";
     return "hsl(var(--region-warning))";
+  };
+
+  const metricLabels: Partial<Record<keyof CountryData, string>> = {
+    renewableEnergyPercent: "Renewable Energy %",
+    electricityCost: "Electricity Cost ($/kWh)",
+    internetSpeed: "Internet Metric",
+    gdpPerCapita: "GDP per Capita",
   };
 
   useEffect(() => {
@@ -55,18 +63,47 @@ export const WorldMap = ({ data, selectedMetric, onCountryClick }: WorldMapProps
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
+    // Pre-compute metric range for normalization
+    const numericValues: number[] = [];
+    data.forEach((country) => {
+      const rawValue = country[selectedMetric as keyof CountryData] as number | undefined;
+      if (typeof rawValue === "number" && !Number.isNaN(rawValue)) {
+        numericValues.push(rawValue);
+      }
+    });
+
+    const min = numericValues.length ? Math.min(...numericValues) : 0;
+    const max = numericValues.length ? Math.max(...numericValues) : 0;
+    const range = max - min || 1;
+
+    const metricKey = selectedMetric as keyof CountryData;
+    const metricLabel = metricLabels[metricKey] ?? String(selectedMetric);
+
     // Add new markers
     data.forEach((country) => {
-      if (!country.latitude || !country.longitude) return;
+      if (
+        typeof country.latitude !== "number" ||
+        Number.isNaN(country.latitude) ||
+        typeof country.longitude !== "number" ||
+        Number.isNaN(country.longitude)
+      ) {
+        return;
+      }
 
-      const metricValue = country[selectedMetric as keyof CountryData] as number | undefined;
-      const score = country.aiDatacenterScore || 50;
-      
+      const rawValue = country[metricKey] as number | undefined;
+      let level: number | undefined;
+      if (typeof rawValue === "number" && !Number.isNaN(rawValue)) {
+        level = ((rawValue - min) / range) * 100;
+      }
+
+      const isActive =
+        activeCountry && activeCountry.countryCode === country.countryCode;
+
       const marker = L.circleMarker([country.latitude, country.longitude], {
-        radius: 8,
-        fillColor: getColorForScore(score),
-        color: "#fff",
-        weight: 2,
+        radius: isActive ? 10 : 8,
+        fillColor: getColorForLevel(level),
+        color: isActive ? "hsl(var(--chart-3))" : "#fff",
+        weight: isActive ? 3 : 2,
         opacity: 1,
         fillOpacity: 0.8,
       });
@@ -75,7 +112,11 @@ export const WorldMap = ({ data, selectedMetric, onCountryClick }: WorldMapProps
         <div class="p-2">
           <h3 class="font-bold text-lg mb-2">${country.country}</h3>
           <div class="space-y-1 text-sm">
-            <p><strong>Score:</strong> ${score.toFixed(1)}/100</p>
+            ${
+              rawValue !== undefined
+                ? `<p><strong>${metricLabel}:</strong> ${rawValue.toLocaleString()}</p>`
+                : ""
+            }
             ${country.renewableEnergyPercent !== undefined ? 
               `<p><strong>Renewable Energy:</strong> ${country.renewableEnergyPercent.toFixed(1)}%</p>` : ''}
             ${country.electricityCost !== undefined ? 
@@ -93,7 +134,18 @@ export const WorldMap = ({ data, selectedMetric, onCountryClick }: WorldMapProps
       marker.addTo(mapInstanceRef.current!);
       markersRef.current.push(marker);
     });
-  }, [data, selectedMetric, onCountryClick]);
+
+    if (
+      activeCountry &&
+      typeof activeCountry.latitude === "number" &&
+      typeof activeCountry.longitude === "number"
+    ) {
+      mapInstanceRef.current.setView(
+        [activeCountry.latitude, activeCountry.longitude],
+        4,
+      );
+    }
+  }, [data, selectedMetric, onCountryClick, activeCountry]);
 
   return (
     <div className="relative h-full w-full rounded-xl overflow-hidden">
@@ -101,14 +153,14 @@ export const WorldMap = ({ data, selectedMetric, onCountryClick }: WorldMapProps
       
       {/* Legend */}
       <div className="absolute bottom-6 right-6 glass-panel p-4 space-y-2">
-        <p className="text-xs font-semibold mb-2">Score Rating</p>
+        <p className="text-xs font-semibold mb-2">Metric Level (relative)</p>
         <div className="space-y-1">
           {[
-            { label: "Excellent (80-100)", color: "var(--region-excellent)" },
-            { label: "Good (60-79)", color: "var(--region-good)" },
-            { label: "Moderate (40-59)", color: "var(--region-moderate)" },
-            { label: "Poor (20-39)", color: "var(--region-poor)" },
-            { label: "Warning (<20)", color: "var(--region-warning)" },
+            { label: "Very High", color: "var(--region-excellent)" },
+            { label: "High", color: "var(--region-good)" },
+            { label: "Medium", color: "var(--region-moderate)" },
+            { label: "Low", color: "var(--region-poor)" },
+            { label: "Very Low", color: "var(--region-warning)" },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-2 text-xs">
               <div

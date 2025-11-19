@@ -4,45 +4,20 @@ export interface CountryData {
   latitude: number;
   longitude: number;
   
-  // Power & Energy metrics
+  // Raw metrics from CIA World Factbook
   renewableEnergyPercent?: number;
   electricityCost?: number;
-  energyStability?: number;
-  
-  // Water metrics
-  waterAvailability?: number;
-  
-  // Climate metrics
-  averageTemperature?: number;
-  coolingRequirement?: number;
-  naturalDisasterRisk?: number;
-  
-  // Economic metrics
   gdpPerCapita?: number;
-  corporateTaxRate?: number;
-  laborCost?: number;
-  landPrice?: number;
-  employmentRate?: number;
-  
-  // Infrastructure metrics
   internetSpeed?: number;
-  connectivityScore?: number;
-  transportationScore?: number;
-  availableLand?: number;
+  averageTemperature?: number;
   
-  // Regulatory & Stability
-  politicalStability?: number;
-  regulatoryEase?: number;
-  
-  // Component scores
-  powerScore?: number;
-  sustainabilityScore?: number;
-  economicScore?: number;
-  infrastructureScore?: number;
-  riskScore?: number;
-  
-  // Overall computed score
-  aiDatacenterScore?: number;
+  // Additional raw metrics (if available from CSVs)
+  waterAvailability?: number;
+  naturalDisasterRisk?: number;
+  corporateTaxRate?: number;
+  co2Emissions?: number;
+  electricityCapacityKw?: number;
+  internetUsers?: number;
 }
 
 export interface FilterState {

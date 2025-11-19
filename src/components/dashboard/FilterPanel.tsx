@@ -18,7 +18,7 @@ export const FilterPanel = ({ filters, onFilterChange }: FilterPanelProps) => {
       temperature: [-20, 50],
       gdp: [0, 100000],
       internetSpeed: [0, 1000],
-      selectedMetric: "aiDatacenterScore",
+      selectedMetric: "renewableEnergyPercent",
     });
   };
 
@@ -138,10 +138,10 @@ export const FilterPanel = ({ filters, onFilterChange }: FilterPanelProps) => {
         <Label className="text-sm font-medium mb-3 block">Display Metric</Label>
         <div className="space-y-2">
           {[
-            { value: "aiDatacenterScore", label: "Overall Score" },
-            { value: "renewableEnergyPercent", label: "Renewable Energy" },
-            { value: "electricityCost", label: "Electricity Cost" },
-            { value: "internetSpeed", label: "Internet Speed" },
+            { value: "renewableEnergyPercent", label: "Renewable Energy %" },
+            { value: "electricityCost", label: "Electricity Cost ($/kWh)" },
+            { value: "internetSpeed", label: "Internet Metric" },
+            { value: "gdpPerCapita", label: "GDP per Capita" },
           ].map((metric) => (
             <Button
               key={metric.value}

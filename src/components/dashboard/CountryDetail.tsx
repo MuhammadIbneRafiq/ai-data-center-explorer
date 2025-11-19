@@ -1,14 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
-import { 
-  Zap, DollarSign, Thermometer, Wifi, TrendingUp, 
-  Activity, Globe, Shield, X 
-} from "lucide-react";
+import { Zap, DollarSign, Wifi, Globe, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { 
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
-  Radar, ResponsiveContainer, Tooltip 
-} from "recharts";
 
 interface CountryDetailProps {
   country: CountryData;
@@ -16,50 +9,38 @@ interface CountryDetailProps {
 }
 
 export const CountryDetail = ({ country, onClose }: CountryDetailProps) => {
-  const radarData = [
-    { metric: "Power", value: country.powerScore || 50 },
-    { metric: "Sustainability", value: country.sustainabilityScore || 50 },
-    { metric: "Economic", value: country.economicScore || 50 },
-    { metric: "Infrastructure", value: country.infrastructureScore || 50 },
-    { metric: "Risk Profile", value: country.riskScore || 50 },
-  ];
-
   const metrics = [
     { 
       icon: Zap, 
-      label: "Power Score", 
-      value: country.powerScore ? `${country.powerScore.toFixed(1)}/100` : 'N/A',
+      label: "Renewable Energy", 
+      value: country.renewableEnergyPercent !== undefined
+        ? `${country.renewableEnergyPercent.toFixed(1)}%`
+        : 'N/A',
       color: "text-region-excellent" 
     },
     { 
-      icon: Activity, 
-      label: "Sustainability", 
-      value: country.sustainabilityScore ? `${country.sustainabilityScore.toFixed(1)}/100` : 'N/A',
-      color: "text-chart-3" 
-    },
-    { 
       icon: DollarSign, 
-      label: "Economic Viability", 
-      value: country.economicScore ? `${country.economicScore.toFixed(1)}/100` : 'N/A',
+      label: "Electricity Cost", 
+      value: country.electricityCost !== undefined
+        ? `$${country.electricityCost.toFixed(3)}/kWh`
+        : 'N/A',
       color: "text-chart-1" 
     },
     { 
       icon: Wifi, 
-      label: "Infrastructure", 
-      value: country.infrastructureScore ? `${country.infrastructureScore.toFixed(1)}/100` : 'N/A',
+      label: "Internet Metric", 
+      value: country.internetSpeed !== undefined
+        ? country.internetSpeed.toFixed(1)
+        : 'N/A',
       color: "text-chart-2" 
     },
     { 
-      icon: Shield, 
-      label: "Risk Profile", 
-      value: country.riskScore ? `${country.riskScore.toFixed(1)}/100` : 'N/A',
-      color: "text-accent" 
-    },
-    { 
-      icon: TrendingUp, 
-      label: "Overall Score", 
-      value: country.aiDatacenterScore ? `${country.aiDatacenterScore.toFixed(1)}/100` : 'N/A',
-      color: "text-primary" 
+      icon: Globe, 
+      label: "GDP per Capita", 
+      value: country.gdpPerCapita !== undefined
+        ? `$${country.gdpPerCapita.toLocaleString()}`
+        : 'N/A',
+      color: "text-chart-3" 
     },
   ];
 
@@ -69,10 +50,7 @@ export const CountryDetail = ({ country, onClose }: CountryDetailProps) => {
         <div>
           <h2 className="text-2xl font-bold">{country.country}</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            AI Datacenter Suitability Score: {' '}
-            <span className="text-lg font-bold text-primary">
-              {country.aiDatacenterScore?.toFixed(1) || 'N/A'}/100
-            </span>
+            Key datacenter-related metrics from the CIA World Factbook
           </p>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
@@ -95,39 +73,6 @@ export const CountryDetail = ({ country, onClose }: CountryDetailProps) => {
         ))}
       </div>
 
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Activity className="h-4 w-4" />
-          Performance Profile
-        </h3>
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={radarData}>
-              <PolarGrid stroke="hsl(var(--border))" />
-              <PolarAngleAxis 
-                dataKey="metric" 
-                tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
-              />
-              <PolarRadiusAxis angle={90} domain={[0, 100]} />
-              <Radar 
-                name={country.country} 
-                dataKey="value" 
-                stroke="hsl(var(--primary))" 
-                fill="hsl(var(--primary))" 
-                fillOpacity={0.3} 
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       <div className="space-y-3 pt-4 border-t border-border">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Globe className="h-4 w-4" />
@@ -147,39 +92,15 @@ export const CountryDetail = ({ country, onClose }: CountryDetailProps) => {
             </p>
           </div>
           <div className="p-3 rounded bg-secondary/10 space-y-1">
-            <span className="text-muted-foreground text-xs">Water Availability</span>
+            <span className="text-muted-foreground text-xs">GDP per Capita</span>
             <p className="font-medium text-lg">
-              {country.waterAvailability ? `${country.waterAvailability.toFixed(0)}/100` : 'N/A'}
+              {country.gdpPerCapita ? `$${country.gdpPerCapita.toLocaleString()}` : 'N/A'}
             </p>
           </div>
           <div className="p-3 rounded bg-secondary/10 space-y-1">
-            <span className="text-muted-foreground text-xs">Disaster Risk</span>
+            <span className="text-muted-foreground text-xs">Avg Temperature (°C)</span>
             <p className="font-medium text-lg">
-              {country.naturalDisasterRisk ? `${country.naturalDisasterRisk.toFixed(0)}/100` : 'N/A'}
-            </p>
-          </div>
-          <div className="p-3 rounded bg-secondary/10 space-y-1">
-            <span className="text-muted-foreground text-xs">Corporate Tax Rate</span>
-            <p className="font-medium text-lg">
-              {country.corporateTaxRate ? `${country.corporateTaxRate.toFixed(1)}%` : 'N/A'}
-            </p>
-          </div>
-          <div className="p-3 rounded bg-secondary/10 space-y-1">
-            <span className="text-muted-foreground text-xs">Land Availability</span>
-            <p className="font-medium text-lg">
-              {country.availableLand ? `${country.availableLand.toFixed(0)}/100` : 'N/A'}
-            </p>
-          </div>
-          <div className="p-3 rounded bg-secondary/10 space-y-1">
-            <span className="text-muted-foreground text-xs">Transport Infrastructure</span>
-            <p className="font-medium text-lg">
-              {country.transportationScore ? `${country.transportationScore.toFixed(0)}/100` : 'N/A'}
-            </p>
-          </div>
-          <div className="p-3 rounded bg-secondary/10 space-y-1">
-            <span className="text-muted-foreground text-xs">Regulatory Ease</span>
-            <p className="font-medium text-lg">
-              {country.regulatoryEase ? `${country.regulatoryEase.toFixed(0)}/100` : 'N/A'}
+              {country.averageTemperature !== undefined ? `${country.averageTemperature.toFixed(1)}°C` : 'N/A'}
             </p>
           </div>
         </div>

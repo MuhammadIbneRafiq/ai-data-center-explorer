@@ -6,10 +6,11 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
 import { MetricsDistribution } from "@/components/dashboard/MetricsDistribution";
+import { ParallelCoordinatesChart } from "@/components/dashboard/ParallelCoordinatesChart";
 import { ScoreBreakdown } from "@/components/dashboard/ScoreBreakdown";
 import { CountryData, FilterState } from "@/types/country-data";
 import { Database, Globe, Zap, TrendingUp, Upload } from "lucide-react";
-import { fetchCountryData, insertSampleData } from "@/lib/supabase-data";
+import { fetchCountryData } from "@/lib/supabase-data";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,7 +21,7 @@ const Index = () => {
     temperature: [-20, 50],
     gdp: [0, 100000],
     internetSpeed: [0, 1000],
-    selectedMetric: "aiDatacenterScore",
+    selectedMetric: "renewableEnergyPercent",
   });
 
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
@@ -37,18 +38,13 @@ const Index = () => {
     try {
       setLoading(true);
       const data = await fetchCountryData();
-      
-      // If no data exists, insert sample data
+      setCountryData(data);
+
       if (data.length === 0) {
         toast({
-          title: "No data found",
-          description: "Loading sample datacenter location data...",
+          title: "No data available",
+          description: "No country metrics were found from Supabase or local CSV files.",
         });
-        await insertSampleData();
-        const newData = await fetchCountryData();
-        setCountryData(newData);
-      } else {
-        setCountryData(data);
       }
     } catch (error) {
       console.error("Error loading country data:", error);
@@ -105,9 +101,14 @@ const Index = () => {
     return true;
   });
 
-  const avgScore =
-    filteredData.reduce((acc, c) => acc + (c.aiDatacenterScore || 0), 0) / filteredData.length;
-  const topScore = Math.max(...filteredData.map((c) => c.aiDatacenterScore || 0));
+  const safeAverage = (values: Array<number | undefined>): number | undefined => {
+    const nums = values.filter((v): v is number => typeof v === "number" && !Number.isNaN(v));
+    if (nums.length === 0) return undefined;
+    return nums.reduce((sum, v) => sum + v, 0) / nums.length;
+  };
+
+  const avgRenewable = safeAverage(filteredData.map((c) => c.renewableEnergyPercent));
+  const avgInternetMetric = safeAverage(filteredData.map((c) => c.internetSpeed));
 
   if (loading) {
     return (
@@ -121,7 +122,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 space-y-6">
+    <div className="min-h-screen bg-background p-4 pb-10 space-y-6">
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="flex-1">
@@ -152,30 +153,34 @@ const Index = () => {
           title="Total Countries Analyzed"
           value={countryData.length}
           icon={Globe}
-          subtitle="With complete data"
+          subtitle="Loaded from database / CSV"
         />
         <StatsCard
           title="Filtered Results"
           value={filteredData.length}
           icon={Database}
-          subtitle="Matching criteria"
+          subtitle="Matching current filters"
         />
         <StatsCard
-          title="Average Score"
-          value={avgScore.toFixed(1)}
+          title="Avg Renewable Energy %"
+          value={
+            avgRenewable !== undefined ? `${avgRenewable.toFixed(1)}%` : "N/A"
+          }
           icon={TrendingUp}
-          subtitle="Out of 100"
+          subtitle="Across filtered countries"
         />
         <StatsCard
-          title="Top Score"
-          value={topScore.toFixed(1)}
+          title="Avg Internet Metric"
+          value={
+            avgInternetMetric !== undefined ? avgInternetMetric.toFixed(1) : "N/A"
+          }
           icon={Zap}
-          subtitle="Best location"
+          subtitle="Higher means better connectivity"
         />
       </div>
 
       {/* Main Dashboard Layout */}
-      <div className="grid grid-cols-12 gap-6 h-[calc(100vh-20rem)]">
+      <div className="grid grid-cols-12 gap-6 min-h-[calc(100vh-20rem)]">
         {/* Left Sidebar - Filters */}
         <div className="col-span-12 lg:col-span-3">
           <FilterPanel filters={filters} onFilterChange={setFilters} />
@@ -188,6 +193,7 @@ const Index = () => {
               data={filteredData}
               selectedMetric={filters.selectedMetric}
               onCountryClick={setSelectedCountry}
+              activeCountry={selectedCountry}
             />
           </div>
         </div>
@@ -215,12 +221,22 @@ const Index = () => {
 
       {/* Bottom Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TopCountriesChart data={filteredData} />
+        <TopCountriesChart
+          data={filteredData}
+          metric={filters.selectedMetric as keyof CountryData}
+          activeCountry={selectedCountry}
+          onCountrySelect={setSelectedCountry}
+        />
         <ScoreBreakdown data={filteredData} />
       </div>
       
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MetricsDistribution data={filteredData} />
+        <ParallelCoordinatesChart
+          data={filteredData}
+          selectedCountry={selectedCountry}
+          onCountrySelect={setSelectedCountry}
+        />
       </div>
     </div>
   );

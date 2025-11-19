@@ -1,62 +1,47 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CountryData } from "@/types/country-data";
+import { fetchCountryDataFromCsv } from "@/lib/csv-data";
 
 export async function fetchCountryData(): Promise<CountryData[]> {
-  const { data, error } = await supabase
-    .from("country_data")
-    .select("*")
-    .order("overall_datacenter_score", { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from("country_data")
+      .select("*");
 
-  if (error) {
-    console.error("Error fetching country data:", error);
-    throw error;
+    console.log("[CountryData] Supabase query result", {
+      hasError: !!error,
+      rowCount: data?.length ?? 0,
+    });
+
+    if (error || !data || data.length === 0) {
+      console.warn(
+        "Supabase unavailable or returned no rows, falling back to CSV data",
+        error,
+      );
+      return await fetchCountryDataFromCsv();
+    }
+
+    // Transform database results to match CountryData type - raw metrics only
+    return data.map((row) => ({
+      country: row.country,
+      countryCode: row.country_code,
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      
+      // Raw metrics only
+      renewableEnergyPercent: row.renewable_energy_percent,
+      electricityCost: row.electricity_cost,
+      gdpPerCapita: row.gdp_per_capita,
+      internetSpeed: row.internet_speed,
+      averageTemperature: row.average_temperature,
+      waterAvailability: row.water_availability_score,
+      naturalDisasterRisk: row.natural_disaster_risk,
+      corporateTaxRate: row.corporate_tax_rate,
+    }));
+  } catch (error) {
+    console.error("Error fetching country data from Supabase, falling back to CSV data:", error);
+    return await fetchCountryDataFromCsv();
   }
-
-  // Transform database results to match CountryData type
-  return (data || []).map((row) => ({
-    country: row.country,
-    countryCode: row.country_code,
-    latitude: Number(row.latitude),
-    longitude: Number(row.longitude),
-    
-    // Power & Energy
-    renewableEnergyPercent: row.renewable_energy_percent,
-    electricityCost: row.electricity_cost,
-    energyStability: row.energy_stability_score,
-    
-    // Water
-    waterAvailability: row.water_availability_score,
-    
-    // Climate
-    averageTemperature: row.average_temperature,
-    coolingRequirement: row.cooling_requirement_index,
-    naturalDisasterRisk: row.natural_disaster_risk,
-    
-    // Economic
-    gdpPerCapita: row.gdp_per_capita,
-    corporateTaxRate: row.corporate_tax_rate,
-    laborCost: row.labor_cost_index,
-    landPrice: row.land_price_index,
-    employmentRate: row.employment_rate,
-    
-    // Infrastructure
-    internetSpeed: row.internet_speed,
-    connectivityScore: row.connectivity_score,
-    transportationScore: row.transportation_infrastructure_score,
-    availableLand: row.available_land_score,
-    
-    // Regulatory
-    politicalStability: row.political_stability_score,
-    regulatoryEase: row.regulatory_ease_score,
-    
-    // Scores
-    powerScore: row.power_score,
-    sustainabilityScore: row.sustainability_score,
-    economicScore: row.economic_viability_score,
-    infrastructureScore: row.infrastructure_score,
-    riskScore: row.risk_score,
-    aiDatacenterScore: row.overall_datacenter_score,
-  }));
 }
 
 export async function insertSampleData() {
