@@ -14,13 +14,126 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      country_data: {
+        Row: {
+          available_land_score: number | null
+          average_temperature: number | null
+          connectivity_score: number | null
+          cooling_requirement_index: number | null
+          corporate_tax_rate: number | null
+          country: string
+          country_code: string
+          created_at: string | null
+          data_sovereignty_score: number | null
+          economic_viability_score: number | null
+          electricity_cost: number | null
+          employment_rate: number | null
+          energy_stability_score: number | null
+          gdp_per_capita: number | null
+          id: string
+          infrastructure_score: number | null
+          internet_speed: number | null
+          labor_cost_index: number | null
+          land_price_index: number | null
+          latitude: number
+          longitude: number
+          natural_disaster_risk: number | null
+          overall_datacenter_score: number | null
+          political_stability_score: number | null
+          power_score: number | null
+          regulatory_ease_score: number | null
+          renewable_energy_percent: number | null
+          risk_score: number | null
+          sustainability_score: number | null
+          transmission_capacity_score: number | null
+          transportation_infrastructure_score: number | null
+          updated_at: string | null
+          water_availability_score: number | null
+          water_cost_index: number | null
+        }
+        Insert: {
+          available_land_score?: number | null
+          average_temperature?: number | null
+          connectivity_score?: number | null
+          cooling_requirement_index?: number | null
+          corporate_tax_rate?: number | null
+          country: string
+          country_code: string
+          created_at?: string | null
+          data_sovereignty_score?: number | null
+          economic_viability_score?: number | null
+          electricity_cost?: number | null
+          employment_rate?: number | null
+          energy_stability_score?: number | null
+          gdp_per_capita?: number | null
+          id?: string
+          infrastructure_score?: number | null
+          internet_speed?: number | null
+          labor_cost_index?: number | null
+          land_price_index?: number | null
+          latitude: number
+          longitude: number
+          natural_disaster_risk?: number | null
+          overall_datacenter_score?: number | null
+          political_stability_score?: number | null
+          power_score?: number | null
+          regulatory_ease_score?: number | null
+          renewable_energy_percent?: number | null
+          risk_score?: number | null
+          sustainability_score?: number | null
+          transmission_capacity_score?: number | null
+          transportation_infrastructure_score?: number | null
+          updated_at?: string | null
+          water_availability_score?: number | null
+          water_cost_index?: number | null
+        }
+        Update: {
+          available_land_score?: number | null
+          average_temperature?: number | null
+          connectivity_score?: number | null
+          cooling_requirement_index?: number | null
+          corporate_tax_rate?: number | null
+          country?: string
+          country_code?: string
+          created_at?: string | null
+          data_sovereignty_score?: number | null
+          economic_viability_score?: number | null
+          electricity_cost?: number | null
+          employment_rate?: number | null
+          energy_stability_score?: number | null
+          gdp_per_capita?: number | null
+          id?: string
+          infrastructure_score?: number | null
+          internet_speed?: number | null
+          labor_cost_index?: number | null
+          land_price_index?: number | null
+          latitude?: number
+          longitude?: number
+          natural_disaster_risk?: number | null
+          overall_datacenter_score?: number | null
+          political_stability_score?: number | null
+          power_score?: number | null
+          regulatory_ease_score?: number | null
+          renewable_energy_percent?: number | null
+          risk_score?: number | null
+          sustainability_score?: number | null
+          transmission_capacity_score?: number | null
+          transportation_infrastructure_score?: number | null
+          updated_at?: string | null
+          water_availability_score?: number | null
+          water_cost_index?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_datacenter_score: {
+        Args: { country_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

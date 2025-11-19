@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { CountryData } from "@/types/country-data";
-import { getCountryCoordinates } from "@/lib/country-coordinates";
 
 interface WorldMapProps {
   data: CountryData[];
@@ -58,13 +57,12 @@ export const WorldMap = ({ data, selectedMetric, onCountryClick }: WorldMapProps
 
     // Add new markers
     data.forEach((country) => {
-      const coords = getCountryCoordinates(country.country);
-      if (!coords) return;
+      if (!country.latitude || !country.longitude) return;
 
       const metricValue = country[selectedMetric as keyof CountryData] as number | undefined;
       const score = country.aiDatacenterScore || 50;
       
-      const marker = L.circleMarker([coords.lat, coords.lng], {
+      const marker = L.circleMarker([country.latitude, country.longitude], {
         radius: 8,
         fillColor: getColorForScore(score),
         color: "#fff",

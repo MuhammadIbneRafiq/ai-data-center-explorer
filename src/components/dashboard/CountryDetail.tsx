@@ -17,50 +17,49 @@ interface CountryDetailProps {
 
 export const CountryDetail = ({ country, onClose }: CountryDetailProps) => {
   const radarData = [
-    { metric: "Renewable Energy", value: country.renewableEnergyPercent || 0 },
-    { metric: "Cost Efficiency", value: 100 - (country.electricityCost || 50) },
-    { metric: "Infrastructure", value: (country.internetSpeed || 0) / 10 },
-    { metric: "Climate", value: Math.max(0, 100 - Math.abs((country.averageTemperature || 0) - 10) * 2) },
-    { metric: "Economic", value: Math.min(100, (country.gdpPerCapita || 0) / 1000) },
-    { metric: "Stability", value: (country.politicalStability || 50) },
+    { metric: "Power", value: country.powerScore || 50 },
+    { metric: "Sustainability", value: country.sustainabilityScore || 50 },
+    { metric: "Economic", value: country.economicScore || 50 },
+    { metric: "Infrastructure", value: country.infrastructureScore || 50 },
+    { metric: "Risk Profile", value: country.riskScore || 50 },
   ];
 
   const metrics = [
     { 
       icon: Zap, 
-      label: "Renewable Energy", 
-      value: `${country.renewableEnergyPercent?.toFixed(1) || 'N/A'}%`,
+      label: "Power Score", 
+      value: country.powerScore ? `${country.powerScore.toFixed(1)}/100` : 'N/A',
       color: "text-region-excellent" 
     },
     { 
+      icon: Activity, 
+      label: "Sustainability", 
+      value: country.sustainabilityScore ? `${country.sustainabilityScore.toFixed(1)}/100` : 'N/A',
+      color: "text-chart-3" 
+    },
+    { 
       icon: DollarSign, 
-      label: "Electricity Cost", 
-      value: country.electricityCost ? `$${country.electricityCost.toFixed(2)}/kWh` : 'N/A',
+      label: "Economic Viability", 
+      value: country.economicScore ? `${country.economicScore.toFixed(1)}/100` : 'N/A',
       color: "text-chart-1" 
     },
     { 
-      icon: Thermometer, 
-      label: "Avg Temperature", 
-      value: country.averageTemperature ? `${country.averageTemperature.toFixed(1)}°C` : 'N/A',
-      color: "text-chart-4" 
-    },
-    { 
       icon: Wifi, 
-      label: "Internet Speed", 
-      value: country.internetSpeed ? `${country.internetSpeed.toFixed(0)} Mbps` : 'N/A',
+      label: "Infrastructure", 
+      value: country.infrastructureScore ? `${country.infrastructureScore.toFixed(1)}/100` : 'N/A',
       color: "text-chart-2" 
     },
     { 
-      icon: TrendingUp, 
-      label: "GDP per Capita", 
-      value: country.gdpPerCapita ? `$${country.gdpPerCapita.toLocaleString()}` : 'N/A',
-      color: "text-region-good" 
+      icon: Shield, 
+      label: "Risk Profile", 
+      value: country.riskScore ? `${country.riskScore.toFixed(1)}/100` : 'N/A',
+      color: "text-accent" 
     },
     { 
-      icon: Shield, 
-      label: "Political Stability", 
-      value: country.politicalStability ? `${country.politicalStability.toFixed(0)}/100` : 'N/A',
-      color: "text-accent" 
+      icon: TrendingUp, 
+      label: "Overall Score", 
+      value: country.aiDatacenterScore ? `${country.aiDatacenterScore.toFixed(1)}/100` : 'N/A',
+      color: "text-primary" 
     },
   ];
 
@@ -132,26 +131,56 @@ export const CountryDetail = ({ country, onClose }: CountryDetailProps) => {
       <div className="space-y-3 pt-4 border-t border-border">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Globe className="h-4 w-4" />
-          Additional Information
+          Key Investment Factors
         </h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between items-center p-2 rounded bg-secondary/10">
-            <span className="text-muted-foreground">Cooling Requirement</span>
-            <span className="font-medium">
-              {country.coolingRequirement ? `${country.coolingRequirement.toFixed(0)} units` : 'N/A'}
-            </span>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Renewable Energy</span>
+            <p className="font-medium text-lg">
+              {country.renewableEnergyPercent ? `${country.renewableEnergyPercent.toFixed(1)}%` : 'N/A'}
+            </p>
           </div>
-          <div className="flex justify-between items-center p-2 rounded bg-secondary/10">
-            <span className="text-muted-foreground">Natural Disaster Risk</span>
-            <span className="font-medium">
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Electricity Cost</span>
+            <p className="font-medium text-lg">
+              {country.electricityCost ? `$${country.electricityCost.toFixed(3)}/kWh` : 'N/A'}
+            </p>
+          </div>
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Water Availability</span>
+            <p className="font-medium text-lg">
+              {country.waterAvailability ? `${country.waterAvailability.toFixed(0)}/100` : 'N/A'}
+            </p>
+          </div>
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Disaster Risk</span>
+            <p className="font-medium text-lg">
               {country.naturalDisasterRisk ? `${country.naturalDisasterRisk.toFixed(0)}/100` : 'N/A'}
-            </span>
+            </p>
           </div>
-          <div className="flex justify-between items-center p-2 rounded bg-secondary/10">
-            <span className="text-muted-foreground">Labor Cost Index</span>
-            <span className="font-medium">
-              {country.laborCost ? `${country.laborCost.toFixed(0)}` : 'N/A'}
-            </span>
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Corporate Tax Rate</span>
+            <p className="font-medium text-lg">
+              {country.corporateTaxRate ? `${country.corporateTaxRate.toFixed(1)}%` : 'N/A'}
+            </p>
+          </div>
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Land Availability</span>
+            <p className="font-medium text-lg">
+              {country.availableLand ? `${country.availableLand.toFixed(0)}/100` : 'N/A'}
+            </p>
+          </div>
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Transport Infrastructure</span>
+            <p className="font-medium text-lg">
+              {country.transportationScore ? `${country.transportationScore.toFixed(0)}/100` : 'N/A'}
+            </p>
+          </div>
+          <div className="p-3 rounded bg-secondary/10 space-y-1">
+            <span className="text-muted-foreground text-xs">Regulatory Ease</span>
+            <p className="font-medium text-lg">
+              {country.regulatoryEase ? `${country.regulatoryEase.toFixed(0)}/100` : 'N/A'}
+            </p>
           </div>
         </div>
       </div>
