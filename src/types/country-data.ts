@@ -4,10 +4,13 @@ export interface CountryData {
   latitude: number;
   longitude: number;
   
-  // Energy metrics
+  // Power & Energy metrics
   renewableEnergyPercent?: number;
   electricityCost?: number;
   energyStability?: number;
+  
+  // Water metrics
+  waterAvailability?: number;
   
   // Climate metrics
   averageTemperature?: number;
@@ -18,13 +21,27 @@ export interface CountryData {
   gdpPerCapita?: number;
   corporateTaxRate?: number;
   laborCost?: number;
+  landPrice?: number;
+  employmentRate?: number;
   
   // Infrastructure metrics
   internetSpeed?: number;
   connectivityScore?: number;
-  politicalStability?: number;
+  transportationScore?: number;
+  availableLand?: number;
   
-  // Computed score
+  // Regulatory & Stability
+  politicalStability?: number;
+  regulatoryEase?: number;
+  
+  // Component scores
+  powerScore?: number;
+  sustainabilityScore?: number;
+  economicScore?: number;
+  infrastructureScore?: number;
+  riskScore?: number;
+  
+  // Overall computed score
   aiDatacenterScore?: number;
 }
 

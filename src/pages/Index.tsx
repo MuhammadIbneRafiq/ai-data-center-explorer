@@ -6,9 +6,12 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
 import { MetricsDistribution } from "@/components/dashboard/MetricsDistribution";
+import { ScoreBreakdown } from "@/components/dashboard/ScoreBreakdown";
 import { CountryData, FilterState } from "@/types/country-data";
-import { Database, Globe, Zap, TrendingUp } from "lucide-react";
-import { getCountryCoordinates } from "@/lib/country-coordinates";
+import { Database, Globe, Zap, TrendingUp, Upload } from "lucide-react";
+import { fetchCountryData, insertSampleData } from "@/lib/supabase-data";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [filters, setFilters] = useState<FilterState>({
@@ -22,31 +25,42 @@ const Index = () => {
 
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
   const [countryData, setCountryData] = useState<CountryData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Generate mock data (In production, this would come from Supabase)
+  // Fetch data from Lovable Cloud
   useEffect(() => {
-    const mockData: CountryData[] = Object.entries(getCountryCoordinates).map(([name, coords]) => ({
-      country: name,
-      countryCode: coords.code,
-      latitude: coords.lat,
-      longitude: coords.lng,
-      renewableEnergyPercent: Math.random() * 100,
-      electricityCost: Math.random() * 0.3,
-      energyStability: 50 + Math.random() * 50,
-      averageTemperature: -10 + Math.random() * 45,
-      coolingRequirement: 30 + Math.random() * 70,
-      naturalDisasterRisk: Math.random() * 100,
-      gdpPerCapita: Math.random() * 80000,
-      corporateTaxRate: 10 + Math.random() * 30,
-      laborCost: Math.random() * 100,
-      internetSpeed: Math.random() * 500,
-      connectivityScore: 50 + Math.random() * 50,
-      politicalStability: 40 + Math.random() * 60,
-      aiDatacenterScore: 30 + Math.random() * 70,
-    }));
-
-    setCountryData(mockData);
+    loadCountryData();
   }, []);
+
+  const loadCountryData = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchCountryData();
+      
+      // If no data exists, insert sample data
+      if (data.length === 0) {
+        toast({
+          title: "No data found",
+          description: "Loading sample datacenter location data...",
+        });
+        await insertSampleData();
+        const newData = await fetchCountryData();
+        setCountryData(newData);
+      } else {
+        setCountryData(data);
+      }
+    } catch (error) {
+      console.error("Error loading country data:", error);
+      toast({
+        title: "Error loading data",
+        description: "Failed to fetch country data from database",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredData = countryData.filter((country) => {
     if (
@@ -95,19 +109,41 @@ const Index = () => {
     filteredData.reduce((acc, c) => acc + (c.aiDatacenterScore || 0), 0) / filteredData.length;
   const topScore = Math.max(...filteredData.map((c) => c.aiDatacenterScore || 0));
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+          <p className="text-lg text-muted-foreground">Loading datacenter analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 space-y-6">
       {/* Header */}
       <header className="flex items-center justify-between">
-        <div>
+        <div className="flex-1">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-chart-2 bg-clip-text text-transparent">
             AI Datacenter Location Analytics
           </h1>
           <p className="text-muted-foreground mt-2">
-            Global analysis of optimal datacenter locations based on CIA World Factbook data
+            Strategic site selection for sustainable and profitable AI infrastructure
           </p>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadCountryData}
+            className="gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Refresh Data
+          </Button>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Stats Overview */}
@@ -180,6 +216,10 @@ const Index = () => {
       {/* Bottom Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TopCountriesChart data={filteredData} />
+        <ScoreBreakdown data={filteredData} />
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6">
         <MetricsDistribution data={filteredData} />
       </div>
     </div>
