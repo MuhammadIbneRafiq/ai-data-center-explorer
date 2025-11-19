@@ -127,10 +127,10 @@ const Index = () => {
       <header className="flex items-center justify-between">
         <div className="flex-1">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-chart-2 bg-clip-text text-transparent">
-            AI Datacenter Location Analytics
+            AI Datacenter Location Dashboard
           </h1>
           <p className="text-muted-foreground mt-2">
-            Strategic site selection for sustainable and profitable AI infrastructure
+            Group 13 Visualization group present
           </p>
         </div>
         <div className="flex items-center gap-3">
