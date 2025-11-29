@@ -28,9 +28,7 @@ export const ParallelCoordinatesChart = ({
 }: ParallelCoordinatesChartProps) => {
   const dimensions: Dimension[] = [
     { key: "gdpPerCapita", label: "GDP per Capita" },
-    { key: "co2Emissions", label: "CO Emissions (Mt)" },
     { key: "electricityCapacityKw", label: "Electric Capacity (kW)" },
-    { key: "renewableEnergyPercent", label: "Renewables (%)" },
     { key: "internetUsers", label: "Internet Users" },
   ];
 
