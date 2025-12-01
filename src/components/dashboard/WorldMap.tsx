@@ -150,28 +150,6 @@ export const WorldMap = ({ data, selectedMetric, onCountryClick, activeCountry }
   return (
     <div className="relative h-full w-full rounded-xl overflow-hidden">
       <div ref={mapRef} className="h-full w-full" />
-      
-      {/* Legend */}
-      <div className="absolute bottom-6 right-6 glass-panel p-4 space-y-2">
-        <p className="text-xs font-semibold mb-2">Metric Level (relative)</p>
-        <div className="space-y-1">
-          {[
-            { label: "Very High", color: "var(--region-excellent)" },
-            { label: "High", color: "var(--region-good)" },
-            { label: "Medium", color: "var(--region-moderate)" },
-            { label: "Low", color: "var(--region-poor)" },
-            { label: "Very Low", color: "var(--region-warning)" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-2 text-xs">
-              <div
-                className="w-4 h-4 rounded-full border-2 border-white"
-                style={{ backgroundColor: `hsl(${item.color})` }}
-              />
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };

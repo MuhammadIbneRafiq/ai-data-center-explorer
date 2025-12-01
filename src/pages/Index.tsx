@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { FilterPanel } from "@/components/dashboard/FilterPanel";
-import { WorldMap } from "@/components/dashboard/WorldMap";
+import { EnhancedWorldMap } from "@/components/dashboard/EnhancedWorldMap";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
 import { MetricsDistribution } from "@/components/dashboard/MetricsDistribution";
-import { ParallelCoordinatesChart } from "@/components/dashboard/ParallelCoordinatesChart";
+import { InteractiveParallelCoordinates } from "@/components/dashboard/InteractiveParallelCoordinates";
+import { EnhancedScatterPlot } from "@/components/dashboard/EnhancedScatterPlot";
 import { ScoreBreakdown } from "@/components/dashboard/ScoreBreakdown";
+import { IntroTutorial } from "@/components/dashboard/IntroTutorial";
 import { CountryData, FilterState } from "@/types/country-data";
 import { Database, Globe, Zap, TrendingUp, Upload } from "lucide-react";
 import { fetchCountryData } from "@/lib/supabase-data";
@@ -27,6 +29,7 @@ const Index = () => {
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
   const [countryData, setCountryData] = useState<CountryData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Fetch data from Lovable Cloud
@@ -122,7 +125,9 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-10 space-y-6">
+    <>
+      <IntroTutorial />
+      <div className="min-h-screen bg-background p-4 pb-10 space-y-6">
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="flex-1">
@@ -189,11 +194,12 @@ const Index = () => {
         {/* Center - Map */}
         <div className="col-span-12 lg:col-span-6">
           <div className="h-full glass-panel rounded-xl overflow-hidden">
-            <WorldMap
+            <EnhancedWorldMap
               data={filteredData}
               selectedMetric={filters.selectedMetric}
               onCountryClick={setSelectedCountry}
               activeCountry={selectedCountry}
+              highlightedCountries={highlightedCountries}
             />
           </div>
         </div>
@@ -231,14 +237,25 @@ const Index = () => {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <MetricsDistribution data={filteredData} />
-        <ParallelCoordinatesChart
+        <EnhancedScatterPlot
           data={filteredData}
-          selectedCountry={selectedCountry}
+          activeCountry={selectedCountry}
           onCountrySelect={setSelectedCountry}
+          highlightedCountries={highlightedCountries}
+        />
+        <InteractiveParallelCoordinates
+          data={filteredData}
+          selectedCountries={selectedCountry ? [selectedCountry] : []}
+          onCountrySelect={setSelectedCountry}
+          highlightedCountries={highlightedCountries}
         />
       </div>
-    </div>
+      
+      <div className="grid grid-cols-1 gap-6">
+        <MetricsDistribution data={filteredData} />
+      </div>
+      </div>
+    </>
   );
 };
 

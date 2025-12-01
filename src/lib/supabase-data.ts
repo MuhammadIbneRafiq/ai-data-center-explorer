@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CountryData } from "@/types/country-data";
-import { fetchCountryDataFromCsv } from "@/lib/csv-data";
+import { loadCiaFinalData } from "@/lib/cia-finaldata-loader";
 
 export async function fetchCountryData(): Promise<CountryData[]> {
   try {
@@ -18,7 +18,7 @@ export async function fetchCountryData(): Promise<CountryData[]> {
         "Supabase unavailable or returned no rows, falling back to CSV data",
         error,
       );
-      return await fetchCountryDataFromCsv();
+      return await loadCiaFinalData();
     }
 
     // Transform database results to match CountryData type - raw metrics only
@@ -40,7 +40,7 @@ export async function fetchCountryData(): Promise<CountryData[]> {
     }));
   } catch (error) {
     console.error("Error fetching country data from Supabase, falling back to CSV data:", error);
-    return await fetchCountryDataFromCsv();
+    return await loadCiaFinalData();
   }
 }
 
