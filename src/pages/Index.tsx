@@ -5,7 +5,7 @@ import { EnhancedWorldMap } from "@/components/dashboard/EnhancedWorldMap";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
-import { MetricsDistribution } from "@/components/dashboard/MetricsDistribution";
+import { SpiderChart } from "@/components/dashboard/SpiderChart";
 import { InteractiveParallelCoordinates } from "@/components/dashboard/InteractiveParallelCoordinates";
 import { EnhancedScatterPlot } from "@/components/dashboard/EnhancedScatterPlot";
 import { ScoreBreakdown } from "@/components/dashboard/ScoreBreakdown";
@@ -252,7 +252,11 @@ const Index = () => {
       </div>
       
       <div className="grid grid-cols-1 gap-6">
-        <MetricsDistribution data={filteredData} />
+        <SpiderChart
+          data={filteredData}
+          selectedCountry={selectedCountry}
+          onCountrySelect={setSelectedCountry}
+        />
       </div>
       </div>
     </>

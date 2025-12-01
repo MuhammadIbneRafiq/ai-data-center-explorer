@@ -41,96 +41,126 @@ export const FilterPanel = ({ filters, onFilterChange }: FilterPanelProps) => {
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <Label className="text-sm font-medium">Renewable Energy %</Label>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs font-semibold text-primary">
               {filters.renewableEnergy[0]}% - {filters.renewableEnergy[1]}%
             </span>
           </div>
-          <Slider
-            value={filters.renewableEnergy}
-            onValueChange={(value) =>
-              onFilterChange({ ...filters, renewableEnergy: value as [number, number] })
-            }
-            min={0}
-            max={100}
-            step={5}
-            className="w-full"
-          />
+          <div className="relative pt-1">
+            <Slider
+              value={filters.renewableEnergy}
+              onValueChange={(value) =>
+                onFilterChange({ ...filters, renewableEnergy: value as [number, number] })
+              }
+              min={0}
+              max={100}
+              step={5}
+              className="w-full"
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted-foreground">0%</span>
+              <span className="text-[10px] text-muted-foreground">100%</span>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <Label className="text-sm font-medium">Electricity Cost ($/kWh)</Label>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs font-semibold text-primary">
               ${filters.electricityCost[0]} - ${filters.electricityCost[1]}
             </span>
           </div>
-          <Slider
-            value={filters.electricityCost}
-            onValueChange={(value) =>
-              onFilterChange({ ...filters, electricityCost: value as [number, number] })
-            }
-            min={0}
-            max={100}
-            step={5}
-            className="w-full"
-          />
+          <div className="relative pt-1">
+            <Slider
+              value={filters.electricityCost}
+              onValueChange={(value) =>
+                onFilterChange({ ...filters, electricityCost: value as [number, number] })
+              }
+              min={0}
+              max={100}
+              step={5}
+              className="w-full"
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted-foreground">$0</span>
+              <span className="text-[10px] text-muted-foreground">$100</span>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <Label className="text-sm font-medium">Avg Temperature (°C)</Label>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs font-semibold text-primary">
               {filters.temperature[0]}°C - {filters.temperature[1]}°C
             </span>
           </div>
-          <Slider
-            value={filters.temperature}
-            onValueChange={(value) =>
-              onFilterChange({ ...filters, temperature: value as [number, number] })
-            }
-            min={-20}
-            max={50}
-            step={5}
-            className="w-full"
-          />
+          <div className="relative pt-1">
+            <Slider
+              value={filters.temperature}
+              onValueChange={(value) =>
+                onFilterChange({ ...filters, temperature: value as [number, number] })
+              }
+              min={-20}
+              max={50}
+              step={5}
+              className="w-full"
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted-foreground">-20°C</span>
+              <span className="text-[10px] text-muted-foreground">50°C</span>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <Label className="text-sm font-medium">GDP per Capita ($)</Label>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs font-semibold text-primary">
               ${filters.gdp[0].toLocaleString()} - ${filters.gdp[1].toLocaleString()}
             </span>
           </div>
-          <Slider
-            value={filters.gdp}
-            onValueChange={(value) =>
-              onFilterChange({ ...filters, gdp: value as [number, number] })
-            }
-            min={0}
-            max={100000}
-            step={5000}
-            className="w-full"
-          />
+          <div className="relative pt-1">
+            <Slider
+              value={filters.gdp}
+              onValueChange={(value) =>
+                onFilterChange({ ...filters, gdp: value as [number, number] })
+              }
+              min={0}
+              max={100000}
+              step={5000}
+              className="w-full"
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted-foreground">$0</span>
+              <span className="text-[10px] text-muted-foreground">$100K</span>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <Label className="text-sm font-medium">Internet Speed (Mbps)</Label>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs font-semibold text-primary">
               {filters.internetSpeed[0]} - {filters.internetSpeed[1]} Mbps
             </span>
           </div>
-          <Slider
-            value={filters.internetSpeed}
-            onValueChange={(value) =>
-              onFilterChange({ ...filters, internetSpeed: value as [number, number] })
-            }
-            min={0}
-            max={1000}
-            step={50}
-            className="w-full"
-          />
+          <div className="relative pt-1">
+            <Slider
+              value={filters.internetSpeed}
+              onValueChange={(value) =>
+                onFilterChange({ ...filters, internetSpeed: value as [number, number] })
+              }
+              min={0}
+              max={1000}
+              step={50}
+              className="w-full"
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted-foreground">0</span>
+              <span className="text-[10px] text-muted-foreground">1000 Mbps</span>
+            </div>
+          </div>
         </div>
       </div>
 

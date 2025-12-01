@@ -68,6 +68,8 @@ export const InteractiveParallelCoordinates = ({
   ]);
   
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
 
@@ -95,6 +97,36 @@ export const InteractiveParallelCoordinates = ({
     if (selectedAttributes.length > 2) {
       setSelectedAttributes(selectedAttributes.filter(a => a.key !== attrKey));
     }
+  };
+
+  // Drag and drop handlers for reordering axes
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newAttributes = [...selectedAttributes];
+    const [removed] = newAttributes.splice(draggedIndex, 1);
+    newAttributes.splice(index, 0, removed);
+    setSelectedAttributes(newAttributes);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   // Normalize data for each attribute
@@ -196,20 +228,35 @@ export const InteractiveParallelCoordinates = ({
         </Select>
       </div>
 
-      {/* Selected attributes chips */}
+      {/* Selected attributes chips - draggable */}
       <div className="flex flex-wrap gap-2">
-        {selectedAttributes.map(attr => (
+        <p className="text-xs text-muted-foreground w-full mb-1">Drag to reorder axes:</p>
+        {selectedAttributes.map((attr, index) => (
           <div
             key={attr.key}
-            className="flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-sm"
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDrop={() => handleDrop(index)}
+            onDragEnd={handleDragEnd}
+            className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm cursor-grab active:cursor-grabbing transition-all ${
+              draggedIndex === index 
+                ? 'bg-primary/30 scale-105 shadow-lg' 
+                : dragOverIndex === index 
+                  ? 'bg-primary/20 ring-2 ring-primary' 
+                  : 'bg-primary/10 hover:bg-primary/15'
+            }`}
           >
-            <span>{attr.label}</span>
+            <span className="select-none">{attr.label}</span>
             {selectedAttributes.length > 2 && (
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-4 w-4 p-0"
-                onClick={() => removeAttribute(attr.key)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeAttribute(attr.key);
+                }}
               >
                 <X className="h-3 w-3" />
               </Button>
