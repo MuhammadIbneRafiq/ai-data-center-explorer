@@ -8,7 +8,6 @@ import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
 import { SpiderChart } from "@/components/dashboard/SpiderChart";
 import { InteractiveParallelCoordinates } from "@/components/dashboard/InteractiveParallelCoordinates";
 import { EnhancedScatterPlot } from "@/components/dashboard/EnhancedScatterPlot";
-import { ScoreBreakdown } from "@/components/dashboard/ScoreBreakdown";
 import { IntroTutorial } from "@/components/dashboard/IntroTutorial";
 import { CountryData, FilterState } from "@/types/country-data";
 import { Database, Globe, Zap, TrendingUp, Upload } from "lucide-react";
@@ -30,6 +29,7 @@ const Index = () => {
   const [countryData, setCountryData] = useState<CountryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
+  const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
   const { toast } = useToast();
 
   // Fetch data from Lovable Cloud
@@ -113,6 +113,28 @@ const Index = () => {
   const avgRenewable = safeAverage(filteredData.map((c) => c.renewableEnergyPercent));
   const avgInternetMetric = safeAverage(filteredData.map((c) => c.internetSpeed));
 
+  const handleSpiderCountrySelect = (
+    country: CountryData,
+    options?: { toggleCompare?: boolean }
+  ) => {
+    setSelectedCountry(country);
+    if (options?.toggleCompare === false) {
+      return;
+    }
+
+    setCompareCountries((prev) => {
+      const exists = prev.some((c) => c.countryCode === country.countryCode);
+      if (exists) {
+        return prev.filter((c) => c.countryCode !== country.countryCode);
+      }
+      return [...prev, country];
+    });
+  };
+
+  const handleCompareCountriesChange = (countries: CountryData[]) => {
+    setCompareCountries(countries);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -128,136 +150,135 @@ const Index = () => {
     <>
       <IntroTutorial />
       <div className="min-h-screen bg-background p-4 pb-10 space-y-6">
-      {/* Header */}
-      <header className="flex items-center justify-between">
-        <div className="flex-1">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-chart-2 bg-clip-text text-transparent">
-            AI Datacenter Location Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Group 13 Visualization group present
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadCountryData}
-            className="gap-2"
-          >
-            <Upload className="h-4 w-4" />
-            Refresh Data
-          </Button>
-          <ThemeToggle />
-        </div>
-      </header>
+        {/* Header */}
+        <header className="flex items-center justify-between">
+          <div className="flex-1">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-chart-2 bg-clip-text text-transparent">
+              AI Datacenter Location Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Group 13 Visualization group present
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadCountryData}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Refresh Data
+            </Button>
+            <ThemeToggle />
+          </div>
+        </header>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard
-          title="Total Countries Analyzed"
-          value={countryData.length}
-          icon={Globe}
-          subtitle="Loaded from database / CSV"
-        />
-        <StatsCard
-          title="Filtered Results"
-          value={filteredData.length}
-          icon={Database}
-          subtitle="Matching current filters"
-        />
-        <StatsCard
-          title="Avg Renewable Energy %"
-          value={
-            avgRenewable !== undefined ? `${avgRenewable.toFixed(1)}%` : "N/A"
-          }
-          icon={TrendingUp}
-          subtitle="Across filtered countries"
-        />
-        <StatsCard
-          title="Avg Internet Metric"
-          value={
-            avgInternetMetric !== undefined ? avgInternetMetric.toFixed(1) : "N/A"
-          }
-          icon={Zap}
-          subtitle="Higher means better connectivity"
-        />
-      </div>
-
-      {/* Main Dashboard Layout */}
-      <div className="grid grid-cols-12 gap-6 min-h-[calc(100vh-20rem)]">
-        {/* Left Sidebar - Filters */}
-        <div className="col-span-12 lg:col-span-3">
-          <FilterPanel filters={filters} onFilterChange={setFilters} />
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Total Countries Analyzed"
+            value={countryData.length}
+            icon={Globe}
+            subtitle="Loaded from database / CSV"
+          />
+          <StatsCard
+            title="Filtered Results"
+            value={filteredData.length}
+            icon={Database}
+            subtitle="Matching current filters"
+          />
+          <StatsCard
+            title="Avg Renewable Energy %"
+            value={
+              avgRenewable !== undefined ? `${avgRenewable.toFixed(1)}%` : "N/A"
+            }
+            icon={TrendingUp}
+            subtitle="Across filtered countries"
+          />
+          <StatsCard
+            title="Avg Internet Metric"
+            value={
+              avgInternetMetric !== undefined ? avgInternetMetric.toFixed(1) : "N/A"
+            }
+            icon={Zap}
+            subtitle="Higher means better connectivity"
+          />
         </div>
 
-        {/* Center - Map */}
-        <div className="col-span-12 lg:col-span-6">
-          <div className="h-full glass-panel rounded-xl overflow-hidden">
-            <EnhancedWorldMap
-              data={filteredData}
-              selectedMetric={filters.selectedMetric}
-              onCountryClick={setSelectedCountry}
-              activeCountry={selectedCountry}
-              highlightedCountries={highlightedCountries}
-            />
+        {/* Main Dashboard Layout */}
+        <div className="grid grid-cols-12 gap-6 min-h-[calc(100vh-20rem)]">
+          {/* Left Sidebar - Filters */}
+          <div className="col-span-12 lg:col-span-3">
+            <FilterPanel filters={filters} onFilterChange={setFilters} />
+          </div>
+
+          {/* Center - Map */}
+          <div className="col-span-12 lg:col-span-6">
+            <div className="h-full glass-panel rounded-xl overflow-hidden">
+              <EnhancedWorldMap
+                data={filteredData}
+                selectedMetric={filters.selectedMetric}
+                onCountryClick={setSelectedCountry}
+                activeCountry={selectedCountry}
+                highlightedCountries={highlightedCountries}
+              />
+            </div>
+          </div>
+
+          {/* Right Sidebar - Details */}
+          <div className="col-span-12 lg:col-span-3">
+            {selectedCountry ? (
+              <CountryDetail
+                country={selectedCountry}
+                onClose={() => setSelectedCountry(null)}
+              />
+            ) : (
+              <div className="glass-panel p-6 h-full flex items-center justify-center text-center">
+                <div className="space-y-3">
+                  <Globe className="h-12 w-12 mx-auto text-muted-foreground" />
+                  <p className="text-lg font-medium">Select a Country</p>
+                  <p className="text-sm text-muted-foreground">
+                    Click on any marker on the map to view detailed analytics
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right Sidebar - Details */}
-        <div className="col-span-12 lg:col-span-3">
-          {selectedCountry ? (
-            <CountryDetail
-              country={selectedCountry}
-              onClose={() => setSelectedCountry(null)}
-            />
-          ) : (
-            <div className="glass-panel p-6 h-full flex items-center justify-center text-center">
-              <div className="space-y-3">
-                <Globe className="h-12 w-12 mx-auto text-muted-foreground" />
-                <p className="text-lg font-medium">Select a Country</p>
-                <p className="text-sm text-muted-foreground">
-                  Click on any marker on the map to view detailed analytics
-                </p>
-              </div>
-            </div>
-          )}
+        {/* Bottom Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TopCountriesChart
+            data={filteredData}
+            metric={filters.selectedMetric as keyof CountryData}
+            activeCountry={selectedCountry}
+            onCountrySelect={setSelectedCountry}
+          />
+          <SpiderChart
+            data={filteredData}
+            selectedCountry={selectedCountry}
+            compareCountries={compareCountries}
+            onCountrySelect={handleSpiderCountrySelect}
+            onClearComparison={() => setCompareCountries([])}
+            onCompareCountriesChange={handleCompareCountriesChange}
+          />
         </div>
-      </div>
 
-      {/* Bottom Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TopCountriesChart
-          data={filteredData}
-          metric={filters.selectedMetric as keyof CountryData}
-          activeCountry={selectedCountry}
-          onCountrySelect={setSelectedCountry}
-        />
-        <ScoreBreakdown data={filteredData} />
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <EnhancedScatterPlot
-          data={filteredData}
-          activeCountry={selectedCountry}
-          onCountrySelect={setSelectedCountry}
-          highlightedCountries={highlightedCountries}
-        />
-        <InteractiveParallelCoordinates
-          data={filteredData}
-          selectedCountries={selectedCountry ? [selectedCountry] : []}
-          onCountrySelect={setSelectedCountry}
-          highlightedCountries={highlightedCountries}
-        />
-      </div>
-      
-      <div className="grid grid-cols-1 gap-6">
-        <SpiderChart
-          data={filteredData}
-          selectedCountry={selectedCountry}
-          onCountrySelect={setSelectedCountry}
-        />
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <EnhancedScatterPlot
+            data={filteredData}
+            activeCountry={selectedCountry}
+            onCountrySelect={setSelectedCountry}
+            highlightedCountries={highlightedCountries}
+          />
+          <InteractiveParallelCoordinates
+            data={filteredData}
+            selectedCountries={selectedCountry ? [selectedCountry] : []}
+            onCountrySelect={setSelectedCountry}
+            highlightedCountries={highlightedCountries}
+          />
+        </div>
       </div>
     </>
   );
