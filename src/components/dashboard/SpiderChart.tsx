@@ -41,7 +41,13 @@ const radarAttributes: RadarAttribute[] = [
   // T3: Efficiency
   { key: "electricity_access_percent", label: "Elec.", fullLabel: "Electricity Access" },
   { key: "co2_per_gdp_tonnes_per_billion", label: "CO₂/GDP", fullLabel: "CO₂ Efficiency (inverted)" },
+  
+  // Workforce/Education
+  { key: "Total_Literacy_Rate", label: "Literacy", fullLabel: "Total Literacy Rate" },
 ];
+
+// Default countries to show (Netherlands, Germany + 3 others with literacy data)
+const DEFAULT_COUNTRIES = ["UNITED STATES", "BANGLADESH", "FRANCE", "JAPAN", "CANADA"];
 
 // Invert these metrics (lower is better)
 const invertedMetrics = ["Unemployment_Rate_percent", "co2_per_gdp_tonnes_per_billion"];
@@ -55,14 +61,41 @@ export const SpiderChart = ({
   onCompareCountriesChange,
 }: SpiderChartProps) => {
   // Calculate normalized values for radar chart
+  // Track countries with missing literacy data for caption
+  const countriesWithMissingLiteracy = useMemo(() => {
+    const candidateCountries = selectedCountry 
+      ? [selectedCountry, ...compareCountries]
+      : compareCountries.length > 0 
+        ? compareCountries
+        : data.filter(c => DEFAULT_COUNTRIES.includes(c.country.toUpperCase()));
+    
+    return candidateCountries.filter(c => {
+      const raw = c.Total_Literacy_Rate;
+      return raw === null || raw === undefined || raw === "";
+    }).map(c => c.country);
+  }, [data, selectedCountry, compareCountries]);
+
   const { radarData, ranges } = useMemo(() => {
     const ranges: Record<string, { min: number; max: number }> = {};
     
     // Calculate ranges for each attribute
     radarAttributes.forEach(attr => {
-      const values = data
-        .map(d => d[attr.key] as number)
-        .filter(v => typeof v === 'number' && !isNaN(v) && isFinite(v));
+      let values: number[];
+      
+      // Handle Total_Literacy_Rate which is stored as string like "98.4%"
+      if (attr.key === "Total_Literacy_Rate") {
+        values = data
+          .map(d => {
+            const raw = d[attr.key];
+            if (raw === null || raw === undefined || raw === "") return NaN;
+            return parseFloat(String(raw).replace("%", ""));
+          })
+          .filter(v => typeof v === 'number' && !isNaN(v) && isFinite(v));
+      } else {
+        values = data
+          .map(d => d[attr.key] as number)
+          .filter(v => typeof v === 'number' && !isNaN(v) && isFinite(v));
+      }
       
       if (values.length > 0) {
         ranges[attr.key] = {
@@ -79,13 +112,26 @@ export const SpiderChart = ({
         fullLabel: attr.fullLabel,
       };
 
-      // Normalize value for a country
-      const normalizeValue = (country: CountryData | null | undefined) => {
-        if (!country) return 0;
-        const value = country[attr.key] as number;
+      // Normalize value for a country - returns null for missing data to show break in polygon
+      const normalizeValue = (country: CountryData | null | undefined): number | null => {
+        if (!country) return null;
+        
+        // Handle Total_Literacy_Rate which is stored as string like "98.4%"
+        let value: number | undefined;
+        if (attr.key === "Total_Literacy_Rate") {
+          const rawValue = country[attr.key];
+          if (rawValue === null || rawValue === undefined || rawValue === "") {
+            return null; // Explicitly return null for missing literacy data
+          }
+          const parsed = parseFloat(String(rawValue).replace("%", ""));
+          value = isNaN(parsed) ? undefined : parsed;
+        } else {
+          value = country[attr.key] as number;
+        }
+        
         const range = ranges[attr.key];
         
-        if (typeof value !== 'number' || isNaN(value) || !range) return 0;
+        if (typeof value !== 'number' || isNaN(value) || !range) return null;
         
         const span = range.max - range.min;
         let normalized = span === 0 ? 0.5 : (value - range.min) / span;
@@ -108,14 +154,13 @@ export const SpiderChart = ({
         result[country.country] = normalizeValue(country);
       });
 
-      // If no countries selected, show top 3 by GDP
+      // If no countries selected, show default 5 countries
       if (!selectedCountry && compareCountries.length === 0) {
-        const topCountries = data
-          .filter(c => c.Real_GDP_per_Capita_USD !== undefined)
-          .sort((a, b) => (b.Real_GDP_per_Capita_USD || 0) - (a.Real_GDP_per_Capita_USD || 0))
-          .slice(0, 3);
+        const defaultCountries = data.filter(c => 
+          DEFAULT_COUNTRIES.includes(c.country.toUpperCase())
+        );
         
-        topCountries.forEach(country => {
+        defaultCountries.forEach(country => {
           result[country.country] = normalizeValue(country);
         });
       }
@@ -134,11 +179,10 @@ export const SpiderChart = ({
     if (compareCountries.length > 0) {
       return compareCountries;
     }
-    // Default to top 3 by GDP
-    return data
-      .filter(c => c.Real_GDP_per_Capita_USD !== undefined)
-      .sort((a, b) => (b.Real_GDP_per_Capita_USD || 0) - (a.Real_GDP_per_Capita_USD || 0))
-      .slice(0, 3);
+    // Default to 5 countries: Netherlands, Germany + 3 others with literacy data
+    return data.filter(c => 
+      DEFAULT_COUNTRIES.includes(c.country.toUpperCase())
+    );
   }, [data, selectedCountry, compareCountries]);
 
   const colors = [
@@ -285,9 +329,14 @@ export const SpiderChart = ({
         </ResponsiveContainer>
       </div>
 
-      <div className="text-xs text-muted-foreground">
-        <p><strong>Metrics:</strong> Road Density, Airports, Internet Users, GDP, Employment (inverted), Electricity Access, CO₂ Efficiency (inverted)</p>
-        <p className="mt-1"><strong>Note:</strong> Higher values are better. Unemployment and CO₂/GDP are inverted so higher = better performance.</p>
+      <div className="text-xs text-muted-foreground space-y-1">
+        <p><strong>Metrics:</strong> Road Density, Airports, Internet Users, GDP, Employment (inverted), Electricity Access, CO₂ Efficiency (inverted), Literacy Rate</p>
+        <p><strong>Note:</strong> Higher values are better. Unemployment and CO₂/GDP are inverted so higher = better performance.</p>
+        {countriesWithMissingLiteracy.length > 0 && (
+          <p className="text-amber-500">
+            <strong>⚠ Missing data:</strong> Literacy rate unavailable for {countriesWithMissingLiteracy.join(", ")}; vertex omitted on that axis.
+          </p>
+        )}
       </div>
     </Card>
   );
