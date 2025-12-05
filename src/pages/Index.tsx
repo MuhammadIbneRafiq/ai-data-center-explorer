@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, ReactNode } from "react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { FilterPanel } from "@/components/dashboard/FilterPanel";
 import { EnhancedWorldMap } from "@/components/dashboard/EnhancedWorldMap";
@@ -9,11 +9,15 @@ import { SpiderChart } from "@/components/dashboard/SpiderChart";
 import { InteractiveParallelCoordinates } from "@/components/dashboard/InteractiveParallelCoordinates";
 import { EnhancedScatterPlot } from "@/components/dashboard/EnhancedScatterPlot";
 import { IntroTutorial } from "@/components/dashboard/IntroTutorial";
+import { DraggableSection } from "@/components/dashboard/DraggableSection";
 import { CountryData, FilterState } from "@/types/country-data";
-import { Database, Globe, Zap, TrendingUp, Upload } from "lucide-react";
+import { Database, Globe, Zap, TrendingUp, Upload, RotateCcw, Move } from "lucide-react";
 import { fetchCountryData } from "@/lib/supabase-data";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+
+// Section IDs for drag and drop
+type SectionId = "map" | "filters" | "details" | "barchart" | "spider" | "scatter" | "parallel";
 
 const Index = () => {
   const [filters, setFilters] = useState<FilterState>({
@@ -31,6 +35,58 @@ const Index = () => {
   const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
   const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
   const { toast } = useToast();
+
+  // Draggable layout state - unified grid with all sections same size
+  const defaultSectionOrder: SectionId[] = ["filters", "map", "details", "barchart", "spider", "scatter", "parallel"];
+  const [sectionOrder, setSectionOrder] = useState<SectionId[]>(defaultSectionOrder);
+  const [draggedSection, setDraggedSection] = useState<SectionId | null>(null);
+  const [dragOverSection, setDragOverSection] = useState<SectionId | null>(null);
+
+  // Drag handlers for reordering sections
+  const handleDragStart = useCallback((id: SectionId) => {
+    setDraggedSection(id);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: SectionId) => {
+    e.preventDefault();
+    if (draggedSection && draggedSection !== id) {
+      setDragOverSection(id);
+    }
+  }, [draggedSection]);
+
+  const handleDrop = useCallback((targetId: SectionId) => {
+    if (!draggedSection || draggedSection === targetId) {
+      setDraggedSection(null);
+      setDragOverSection(null);
+      return;
+    }
+
+    // Unified grid - any section can swap with any other
+    setSectionOrder((prevOrder) => {
+      const newOrder = [...prevOrder];
+      const draggedIndex = newOrder.indexOf(draggedSection);
+      const targetIndex = newOrder.indexOf(targetId);
+      
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        // Swap the two sections
+        newOrder[draggedIndex] = targetId;
+        newOrder[targetIndex] = draggedSection;
+      }
+      
+      return newOrder;
+    });
+
+    setDraggedSection(null);
+    setDragOverSection(null);
+  }, [draggedSection]);
+
+  const resetLayout = useCallback(() => {
+    setSectionOrder(defaultSectionOrder);
+    toast({
+      title: "Layout Reset",
+      description: "Dashboard layout has been reset to default.",
+    });
+  }, [toast]);
 
   // Fetch data from Lovable Cloud
   useEffect(() => {
@@ -164,6 +220,15 @@ const Index = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={resetLayout}
+              className="gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset Layout
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={loadCountryData}
               className="gap-2"
             >
@@ -173,6 +238,12 @@ const Index = () => {
             <ThemeToggle />
           </div>
         </header>
+        
+        {/* Layout hint */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+          <Move className="h-4 w-4" />
+          <span>Drag charts by their left handle to rearrange the layout</span>
+        </div>
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -206,78 +277,98 @@ const Index = () => {
           />
         </div>
 
-        {/* Main Dashboard Layout */}
-        <div className="grid grid-cols-12 gap-6 min-h-[calc(100vh-20rem)]">
-          {/* Left Sidebar - Filters */}
-          <div className="col-span-12 lg:col-span-3">
-            <FilterPanel filters={filters} onFilterChange={setFilters} />
-          </div>
-
-          {/* Center - Map */}
-          <div className="col-span-12 lg:col-span-6">
-            <div className="h-full glass-panel rounded-xl overflow-hidden">
-              <EnhancedWorldMap
-                data={filteredData}
-                selectedMetric={filters.selectedMetric}
-                onCountryClick={setSelectedCountry}
-                activeCountry={selectedCountry}
-                highlightedCountries={highlightedCountries}
-              />
-            </div>
-          </div>
-
-          {/* Right Sidebar - Details */}
-          <div className="col-span-12 lg:col-span-3">
-            {selectedCountry ? (
-              <CountryDetail
-                country={selectedCountry}
-                onClose={() => setSelectedCountry(null)}
-              />
-            ) : (
-              <div className="glass-panel p-6 h-full flex items-center justify-center text-center">
-                <div className="space-y-3">
-                  <Globe className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <p className="text-lg font-medium">Select a Country</p>
-                  <p className="text-sm text-muted-foreground">
-                    Click on any marker on the map to view detailed analytics
-                  </p>
+        {/* Unified Draggable Grid - All sections same size */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {sectionOrder.map((sectionId) => {
+            const allComponents: Record<SectionId, ReactNode> = {
+              filters: (
+                <div className="h-full min-h-[420px]">
+                  <FilterPanel filters={filters} onFilterChange={setFilters} />
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
+              ),
+              map: (
+                <div className="h-full glass-panel rounded-xl overflow-hidden min-h-[420px]">
+                  <EnhancedWorldMap
+                    data={filteredData}
+                    selectedMetric={filters.selectedMetric}
+                    onCountryClick={setSelectedCountry}
+                    activeCountry={selectedCountry}
+                    highlightedCountries={highlightedCountries}
+                  />
+                </div>
+              ),
+              details: (
+                <div className="h-full min-h-[420px]">
+                  {selectedCountry ? (
+                    <CountryDetail
+                      country={selectedCountry}
+                      onClose={() => setSelectedCountry(null)}
+                    />
+                  ) : (
+                    <div className="glass-panel p-6 h-full flex items-center justify-center text-center">
+                      <div className="space-y-3">
+                        <Globe className="h-12 w-12 mx-auto text-muted-foreground" />
+                        <p className="text-lg font-medium">Select a Country</p>
+                        <p className="text-sm text-muted-foreground">
+                          Click on any marker on the map to view detailed analytics
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ),
+              barchart: (
+                <TopCountriesChart
+                  data={filteredData}
+                  metric={filters.selectedMetric as keyof CountryData}
+                  activeCountry={selectedCountry}
+                  onCountrySelect={setSelectedCountry}
+                  highlightedCountries={highlightedCountries}
+                  onBrushSelection={setHighlightedCountries}
+                />
+              ),
+              spider: (
+                <SpiderChart
+                  data={filteredData}
+                  selectedCountry={selectedCountry}
+                  compareCountries={compareCountries}
+                  onCountrySelect={handleSpiderCountrySelect}
+                  onClearComparison={() => setCompareCountries([])}
+                  onCompareCountriesChange={handleCompareCountriesChange}
+                />
+              ),
+              scatter: (
+                <EnhancedScatterPlot
+                  data={filteredData}
+                  activeCountry={selectedCountry}
+                  onCountrySelect={setSelectedCountry}
+                  highlightedCountries={highlightedCountries}
+                />
+              ),
+              parallel: (
+                <InteractiveParallelCoordinates
+                  data={filteredData}
+                  selectedCountries={selectedCountry ? [selectedCountry] : []}
+                  onCountrySelect={setSelectedCountry}
+                  highlightedCountries={highlightedCountries}
+                />
+              ),
+            };
 
-        {/* Bottom Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <TopCountriesChart
-            data={filteredData}
-            metric={filters.selectedMetric as keyof CountryData}
-            activeCountry={selectedCountry}
-            onCountrySelect={setSelectedCountry}
-          />
-          <SpiderChart
-            data={filteredData}
-            selectedCountry={selectedCountry}
-            compareCountries={compareCountries}
-            onCountrySelect={handleSpiderCountrySelect}
-            onClearComparison={() => setCompareCountries([])}
-            onCompareCountriesChange={handleCompareCountriesChange}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <EnhancedScatterPlot
-            data={filteredData}
-            activeCountry={selectedCountry}
-            onCountrySelect={setSelectedCountry}
-            highlightedCountries={highlightedCountries}
-          />
-          <InteractiveParallelCoordinates
-            data={filteredData}
-            selectedCountries={selectedCountry ? [selectedCountry] : []}
-            onCountrySelect={setSelectedCountry}
-            highlightedCountries={highlightedCountries}
-          />
+            return (
+              <DraggableSection
+                key={sectionId}
+                id={sectionId}
+                onDragStart={(id) => handleDragStart(id as SectionId)}
+                onDragOver={(e, id) => handleDragOver(e, id as SectionId)}
+                onDrop={(id) => handleDrop(id as SectionId)}
+                isDragging={draggedSection === sectionId}
+                isDragOver={dragOverSection === sectionId}
+              >
+                {allComponents[sectionId]}
+              </DraggableSection>
+            );
+          })}
         </div>
       </div>
     </>
