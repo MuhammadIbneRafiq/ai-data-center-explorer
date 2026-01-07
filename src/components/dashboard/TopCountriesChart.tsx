@@ -212,12 +212,23 @@ export const TopCountriesChart = ({
                 backgroundColor: "hsl(var(--card))",
                 border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
+                color: "hsl(var(--foreground))", // fallback
               }}
-              formatter={(value: number) => [value.toFixed(2), metricLabel]}
+              labelStyle={{
+                color: "hsl(var(--foreground))",
+              }}
+              itemStyle={{
+                color: "hsl(var(--foreground))",
+              }}
+              formatter={(value: number) => [
+                value.toFixed(2),
+                metricLabel,
+              ]}
             />
+
             <Bar
               dataKey="value"
-              radius={[0, 8, 8, 0]}
+              radius={[0, 0, 0, 0]}
               onClick={(_, index) => {
                 const item = topCountries[index];
                 if (item && onCountrySelect) {
