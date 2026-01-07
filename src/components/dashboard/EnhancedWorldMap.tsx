@@ -115,7 +115,7 @@ export const EnhancedWorldMap = ({
     datacenterMarkersRef.current = [];
 
     datacenterLocations.forEach((dc) => {
-      if (!dc.countryCode) return;
+      if (!dc.countryCode || dc.hyperscaleDatacenters === 0) return;
       
       const coords = getCountryCoords(dc.countryCode);
       if (!coords) return;
