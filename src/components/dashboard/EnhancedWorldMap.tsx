@@ -49,22 +49,6 @@ export const EnhancedWorldMap = ({
       });
   }, []);
 
-  // Sequential lightness scale following Munzner's channel effectiveness ranking
-  // Using GREEN hue because human vision is most sensitive to green:
-  // - Eyes have more green-sensitive (M) cones than red or blue
-  // - Green contributes ~59% of perceived luminance (vs ~30% red, ~11% blue)
-  // - We can discriminate MORE shades of green than any other hue
-  // Convention: "more is darker" - higher values get lower lightness
-  const getColorForLevel = (level: number | undefined): string => {
-    if (level === undefined || Number.isNaN(level)) return "hsl(140, 10%, 18%)"; // No data: very dark, desaturated
-    
-    // Single-hue sequential scale: hue=140 (green), varying lightness
-    // level 0 → lightness 88% (light green), level 100 → lightness 25% (dark green)
-    const lightness = 88 - (level / 100) * 63; // Maps 0-100 to 88%-25% lightness
-    const saturation = 45 + (level / 100) * 35; // 45% to 80% saturation
-    return `hsl(140, ${saturation}%, ${lightness}%)`;
-  };
-
   // Create country lookup map
   const countryLookup = useRef<Map<string, CountryData>>(new Map());
   useEffect(() => {
@@ -234,55 +218,36 @@ export const EnhancedWorldMap = ({
       geoJsonLayerRef.current.remove();
     }
 
-    // Pre-compute metric range for normalization
-    const numericValues: number[] = [];
-    data.forEach((country) => {
-      const rawValue = country[selectedMetric as keyof CountryData] as number | undefined;
-      if (typeof rawValue === "number" && !Number.isNaN(rawValue)) {
-        numericValues.push(rawValue);
-      }
-    });
-
-    const min = numericValues.length ? Math.min(...numericValues) : 0;
-    const max = numericValues.length ? Math.max(...numericValues) : 0;
-    const range = max - min || 1;
-
     // Create GeoJSON layer
     const geoJsonLayer = L.geoJSON(geoJsonData, {
       style: (feature) => {
         const countryName = feature?.properties?.ADMIN || feature?.properties?.name || "";
         const country = findCountry(countryName);
         
-        // Minimal default styling - low contrast for countries without data
-        let fillColor = "hsl(210, 5%, 20%)";
-        let fillOpacity = 0.15;
+        // Default neutral styling; color is not tied to renewable energy or any metric
+        let fillColor = "hsl(210, 8%, 18%)";
+        let fillOpacity = 0.12;
         let weight = 0.5;
-        let color = "hsl(210, 10%, 30%)";
+        let color = "hsl(210, 12%, 32%)";
 
         if (country) {
-          const rawValue = country[selectedMetric as keyof CountryData] as number | undefined;
-          if (typeof rawValue === "number" && !isNaN(rawValue)) {
-            const level = ((rawValue - min) / range) * 100;
-            fillColor = getColorForLevel(level);
-            fillOpacity = 0.65;
-          }
-
-          // Highlight logic - subtle emphasis without extra colors
+          // Highlight logic - emphasize only when brushed/selected
           if (highlightedCountries && highlightedCountries.size > 0) {
             if (highlightedCountries.has(country.countryCode)) {
-              fillOpacity = 0.85;
-              weight = 1.5;
-              color = "hsl(210, 50%, 60%)";
+              fillOpacity = 0.5;
+              weight = 1.4;
+              color = "hsl(200, 70%, 60%)";
+              fillColor = "hsl(200, 60%, 40%)";
             } else {
-              fillOpacity = 0.15;
+              fillOpacity = 0.08;
             }
           }
 
           // Active country - only border emphasis, no new color
           if (activeCountry && activeCountry.countryCode === country.countryCode) {
-            weight = 2;
-            color = "hsl(210, 60%, 70%)";
-            fillOpacity = 0.9;
+            weight = 2.2;
+            color = "hsl(200, 80%, 72%)";
+            fillOpacity = 0.65;
           }
         }
 
@@ -369,41 +334,9 @@ export const EnhancedWorldMap = ({
     return undefined;
   };
 
-  // Format metric name for display
-  const formatMetricName = (metric: string): string => {
-    const names: Record<string, string> = {
-      renewableEnergyPercent: "Renewable Energy %",
-      gdpPerCapita: "GDP per Capita",
-      Real_GDP_per_Capita_USD: "Real GDP per Capita (USD)",
-      internet_users_per_100: "Internet Users per 100",
-      internetSpeed: "Internet Speed",
-      electricityCost: "Electricity Cost",
-      averageTemperature: "Avg Temperature",
-      electricity_access_percent: "Electricity Access %",
-      total_literacy_rate: "Literacy Rate %",
-    };
-    return names[metric] || metric;
-  };
-
   return (
     <div className="relative h-full w-full rounded-xl overflow-hidden">
       <div ref={mapRef} className="h-full w-full" />
-      
-      {/* Sequential Lightness Legend */}
-      <div className="absolute bottom-4 right-4 bg-card/90 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-border/50 z-[1000]">
-        <p className="text-xs font-medium text-foreground mb-2">{formatMetricName(selectedMetric)}</p>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground">Low</span>
-          <div 
-            className="h-3 w-24 rounded-sm"
-            style={{
-              background: "linear-gradient(to right, hsl(140, 45%, 88%), hsl(140, 80%, 25%))"
-            }}
-          />
-          <span className="text-[10px] text-muted-foreground">High</span>
-        </div>
-        <p className="text-[9px] text-muted-foreground mt-1 italic">Darker = higher value</p>
-      </div>
 
       {!geoJsonData && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
