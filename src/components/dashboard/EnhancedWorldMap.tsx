@@ -145,6 +145,7 @@ export const EnhancedWorldMap = ({
                 onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 10px; font-weight: bold; color: #333;\\'>${dc.countryCode}</span>'"
               />
             </div>
+            ${dc.hyperscaleDatacenters > 0 ? `
             <div style="
               position: absolute;
               bottom: -4px;
@@ -163,8 +164,9 @@ export const EnhancedWorldMap = ({
               box-shadow: 0 1px 4px rgba(0,0,0,0.3);
               border: 1px solid white;
             ">
-              ${dc.totalDatacenters > 999 ? '999+' : dc.totalDatacenters}
+              ${dc.hyperscaleDatacenters}
             </div>
+            ` : ''}
           </div>
         `,
         iconSize: [40, 40],
