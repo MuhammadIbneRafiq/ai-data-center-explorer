@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, ReactNode } from "react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { FilterPanel } from "@/components/dashboard/FilterPanel";
-import { EnhancedWorldMap } from "@/components/dashboard/EnhancedWorldMap";
+import { DecisionTree } from "@/components/dashboard/DecisionTree";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 // Section IDs for drag and drop
-type SectionId = "map" | "filters" | "details" | "barchart" | "spider" | "scatter" | "parallel";
+type SectionId = "decision" | "filters" | "details" | "barchart" | "spider" | "scatter" | "parallel";
 
 const Index = () => {
   const [filters, setFilters] = useState<FilterState>({
@@ -37,7 +37,7 @@ const Index = () => {
   const { toast } = useToast();
 
   // Draggable layout state - unified grid with all sections same size
-  const defaultSectionOrder: SectionId[] = ["filters", "map", "details", "barchart", "spider", "scatter", "parallel"];
+  const defaultSectionOrder: SectionId[] = ["decision", "filters", "details", "barchart", "spider", "scatter", "parallel"];
   const [sectionOrder, setSectionOrder] = useState<SectionId[]>(defaultSectionOrder);
   const [draggedSection, setDraggedSection] = useState<SectionId | null>(null);
   const [dragOverSection, setDragOverSection] = useState<SectionId | null>(null);
@@ -281,20 +281,18 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {sectionOrder.map((sectionId) => {
             const allComponents: Record<SectionId, ReactNode> = {
+              decision: (
+                <div className="h-full min-h-[520px]">
+                  <DecisionTree
+                    data={filteredData}
+                    onCountrySelect={setSelectedCountry}
+                    selectedCountry={selectedCountry}
+                  />
+                </div>
+              ),
               filters: (
                 <div className="h-full min-h-[420px]">
                   <FilterPanel filters={filters} onFilterChange={setFilters} />
-                </div>
-              ),
-              map: (
-                <div className="h-full glass-panel rounded-xl overflow-hidden min-h-[420px]">
-                  <EnhancedWorldMap
-                    data={filteredData}
-                    selectedMetric={filters.selectedMetric}
-                    onCountryClick={setSelectedCountry}
-                    activeCountry={selectedCountry}
-                    highlightedCountries={highlightedCountries}
-                  />
                 </div>
               ),
               details: (
