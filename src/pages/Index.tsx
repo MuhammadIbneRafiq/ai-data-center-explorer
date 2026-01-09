@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, ReactNode } from "react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { FilterPanel } from "@/components/dashboard/FilterPanel";
-import { DecisionTree } from "@/components/dashboard/DecisionTree";
+import InteractiveDecisionTree from "@/components/dashboard/InteractiveDecisionTree";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
@@ -282,11 +282,18 @@ const Index = () => {
           {sectionOrder.map((sectionId) => {
             const allComponents: Record<SectionId, ReactNode> = {
               decision: (
-                <div className="h-full min-h-[520px]">
-                  <DecisionTree
-                    data={filteredData}
-                    onCountrySelect={setSelectedCountry}
-                    selectedCountry={selectedCountry}
+                <div className="h-full min-h-[600px]">
+                  <InteractiveDecisionTree
+                    data={filteredData.map(c => ({
+                      country: c.country,
+                      country_code: c.countryCode,
+                      renewable_energy_percent: c.renewableEnergyPercent ?? null,
+                      electricity_cost: c.electricityCost ?? null,
+                      average_temperature: c.averageTemperature ?? null,
+                      connectivity_score: c.internet_users_per_100 ?? null,
+                      gdp_per_capita: c.gdpPerCapita ?? null,
+                      overall_datacenter_score: c.renewableEnergyPercent ?? null,
+                    }))}
                   />
                 </div>
               ),
