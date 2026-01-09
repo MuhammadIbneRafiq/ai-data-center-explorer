@@ -34,6 +34,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
   const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
+  const [treeFilteredCountries, setTreeFilteredCountries] = useState<string[]>([]);
   const { toast } = useToast();
 
   // Draggable layout state - unified grid with all sections same size
@@ -191,6 +192,34 @@ const Index = () => {
     setCompareCountries(countries);
   };
 
+  // Bidirectional: when tree filters countries, update highlighted
+  const handleTreeCountriesFilter = useCallback((countryCodes: string[]) => {
+    setTreeFilteredCountries(countryCodes);
+  }, []);
+
+  // Bidirectional: when country selected in tree, update main selection
+  const handleTreeCountrySelect = useCallback((countryCode: string) => {
+    const country = countryData.find(c => c.countryCode === countryCode);
+    if (country) {
+      setSelectedCountry(country);
+      // Also add to highlighted
+      setHighlightedCountries(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(countryCode)) {
+          newSet.delete(countryCode);
+        } else {
+          newSet.add(countryCode);
+        }
+        return newSet;
+      });
+    }
+  }, [countryData]);
+
+  // Handle country selection from charts - adds to highlighted set for tree
+  const handleChartCountrySelect = useCallback((country: CountryData) => {
+    setSelectedCountry(country);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -242,7 +271,7 @@ const Index = () => {
         {/* Layout hint */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
           <Move className="h-4 w-4" />
-          <span>Drag charts by their left handle to rearrange the layout</span>
+          <span>Drag charts by their left handle to rearrange • Select countries in charts to filter the decision tree • Click tree nodes to highlight in charts</span>
         </div>
 
         {/* Stats Overview */}
@@ -294,6 +323,9 @@ const Index = () => {
                       gdp_per_capita: c.gdpPerCapita ?? null,
                       overall_datacenter_score: c.renewableEnergyPercent ?? null,
                     }))}
+                    selectedCountryCodes={highlightedCountries}
+                    onCountrySelect={handleTreeCountrySelect}
+                    onCountriesFilter={handleTreeCountriesFilter}
                   />
                 </div>
               ),
@@ -327,7 +359,7 @@ const Index = () => {
                   data={filteredData}
                   metric={filters.selectedMetric as keyof CountryData}
                   activeCountry={selectedCountry}
-                  onCountrySelect={setSelectedCountry}
+                  onCountrySelect={handleChartCountrySelect}
                   highlightedCountries={highlightedCountries}
                   onBrushSelection={setHighlightedCountries}
                 />
@@ -346,15 +378,16 @@ const Index = () => {
                 <EnhancedScatterPlot
                   data={filteredData}
                   activeCountry={selectedCountry}
-                  onCountrySelect={setSelectedCountry}
+                  onCountrySelect={handleChartCountrySelect}
                   highlightedCountries={highlightedCountries}
+                  onBrushSelection={setHighlightedCountries}
                 />
               ),
               parallel: (
                 <InteractiveParallelCoordinates
                   data={filteredData}
                   selectedCountries={selectedCountry ? [selectedCountry] : []}
-                  onCountrySelect={setSelectedCountry}
+                  onCountrySelect={handleChartCountrySelect}
                   highlightedCountries={highlightedCountries}
                 />
               ),

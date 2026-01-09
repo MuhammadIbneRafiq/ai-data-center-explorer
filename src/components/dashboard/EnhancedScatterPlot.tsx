@@ -1,14 +1,17 @@
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
-import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ZAxis } from "recharts";
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ZAxis, ReferenceArea } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface EnhancedScatterPlotProps {
   data: CountryData[];
   activeCountry?: CountryData | null;
   onCountrySelect?: (country: CountryData) => void;
   highlightedCountries?: Set<string>;
+  onBrushSelection?: (countryCodes: Set<string>) => void;
 }
 
 interface AttributeOption {
@@ -34,10 +37,15 @@ export const EnhancedScatterPlot = ({
   activeCountry,
   onCountrySelect,
   highlightedCountries,
+  onBrushSelection,
 }: EnhancedScatterPlotProps) => {
   const [xAxis, setXAxis] = useState<keyof CountryData>("Real_GDP_per_Capita_USD");
   const [yAxis, setYAxis] = useState<keyof CountryData>("co2_per_capita_tonnes");
   const [sizeAxis, setSizeAxis] = useState<keyof CountryData>("electricity_capacity_per_capita");
+  const [isBrushing, setIsBrushing] = useState(false);
+  const [brushStart, setBrushStart] = useState<{ x: number; y: number } | null>(null);
+  const [brushEnd, setBrushEnd] = useState<{ x: number; y: number } | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   const scatterData = data
     .filter(country => {
@@ -81,13 +89,54 @@ export const EnhancedScatterPlot = ({
   const yLabel = attributeOptions.find(a => a.key === yAxis)?.label || String(yAxis);
   const sizeLabel = attributeOptions.find(a => a.key === sizeAxis)?.label || String(sizeAxis);
 
+  const hasSelection = highlightedCountries && highlightedCountries.size > 0;
+
+  const handleClearSelection = () => {
+    if (onBrushSelection) {
+      onBrushSelection(new Set());
+    }
+  };
+
+  const handlePointClick = (entry: typeof scatterData[0]) => {
+    if (!entry || !entry.country) return;
+    
+    // Add to or remove from highlighted set
+    if (onBrushSelection) {
+      const newSet = new Set(highlightedCountries);
+      if (newSet.has(entry.country.countryCode)) {
+        newSet.delete(entry.country.countryCode);
+      } else {
+        newSet.add(entry.country.countryCode);
+      }
+      onBrushSelection(newSet);
+    }
+    
+    // Also select the country
+    if (onCountrySelect) {
+      onCountrySelect(entry.country);
+    }
+  };
+
   return (
     <Card className="glass-panel p-6 space-y-4">
-      <div>
-        <h3 className="text-lg font-bold">Multi-Dimensional Scatter Plot</h3>
-        <p className="text-sm text-muted-foreground">
-          Click on points to select countries. Bubble size represents {sizeLabel}.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold">Multi-Dimensional Scatter Plot</h3>
+          <p className="text-sm text-muted-foreground">
+            Click points to select countries for the decision tree. Size = {sizeLabel}.
+          </p>
+        </div>
+        {hasSelection && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClearSelection}
+            className="gap-1"
+          >
+            <X className="h-4 w-4" />
+            Clear ({highlightedCountries?.size})
+          </Button>
+        )}
       </div>
 
       {/* Axis selectors */}
@@ -141,7 +190,7 @@ export const EnhancedScatterPlot = ({
         </div>
       </div>
 
-      <div className="h-96">
+      <div ref={chartRef} className="h-96">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
             <XAxis
@@ -179,11 +228,7 @@ export const EnhancedScatterPlot = ({
             />
             <Scatter
               data={scatterData}
-              onClick={(data) => {
-                if (data && data.country && onCountrySelect) {
-                  onCountrySelect(data.country);
-                }
-              }}
+              onClick={(data) => handlePointClick(data as typeof scatterData[0])}
             >
               {scatterData.map((entry) => (
                 <Cell
