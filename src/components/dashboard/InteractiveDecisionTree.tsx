@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { TreeDeciduous, Leaf, Zap, Thermometer, Wifi, DollarSign, RotateCcw, ZoomIn, ZoomOut, Move } from 'lucide-react';
+import { TreeDeciduous, Leaf, Zap, Thermometer, Wifi, DollarSign, RotateCcw, ZoomIn, ZoomOut, Move, Hand } from 'lucide-react';
 
 interface CountryData {
   country: string;
@@ -33,10 +33,14 @@ interface TreeNode {
   isHighlighted?: boolean;
   isGreen?: boolean;
   level: number;
+  countryCode?: string;
 }
 
 interface InteractiveDecisionTreeProps {
   data: CountryData[];
+  selectedCountryCodes?: Set<string>;
+  onCountrySelect?: (countryCode: string) => void;
+  onCountriesFilter?: (countryCodes: string[]) => void;
 }
 
 const CRITERIA: DecisionCriteria[] = [
@@ -97,13 +101,21 @@ const CRITERIA: DecisionCriteria[] = [
   },
 ];
 
-const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data }) => {
+const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ 
+  data, 
+  selectedCountryCodes = new Set(),
+  onCountrySelect,
+  onCountriesFilter,
+}) => {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [greenLevel, setGreenLevel] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragMode, setDragMode] = useState<'pan' | 'node'>('pan');
+  const [draggedNode, setDraggedNode] = useState<string | null>(null);
+  const [nodeOffsets, setNodeOffsets] = useState<Record<string, { dx: number; dy: number }>>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -161,11 +173,26 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
     return true;
   }, [selections]);
 
+  // Use external selection if provided, otherwise filter by criteria
+  const baseCountries = useMemo(() => {
+    if (selectedCountryCodes.size > 0) {
+      return data.filter(c => selectedCountryCodes.has(c.country_code));
+    }
+    return data;
+  }, [data, selectedCountryCodes]);
+
   const filteredCountries = useMemo(() => {
-    return data.filter(filterCountry).sort((a, b) => 
+    return baseCountries.filter(filterCountry).sort((a, b) => 
       (b.overall_datacenter_score || 0) - (a.overall_datacenter_score || 0)
     );
-  }, [data, filterCountry]);
+  }, [baseCountries, filterCountry]);
+
+  // Notify parent of filtered countries
+  useEffect(() => {
+    if (onCountriesFilter && Object.keys(selections).length > 0) {
+      onCountriesFilter(filteredCountries.map(c => c.country_code));
+    }
+  }, [filteredCountries, onCountriesFilter, selections]);
 
   const winner = filteredCountries[0];
 
@@ -184,10 +211,10 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
       isHighlighted: true,
       isGreen: greenLevel > 0,
       level: 0,
+      countryCode: winner?.country_code,
     };
 
     // Create criteria level nodes
-    const selectedCriteria = CRITERIA.filter(c => selections[c.id]);
     const allCriteria = CRITERIA;
     
     const criteriaSpacing = SVG_WIDTH / (allCriteria.length + 1);
@@ -234,6 +261,7 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
     const countrySpacing = SVG_WIDTH / (countriesToShow.length + 1);
     
     countriesToShow.forEach((country, idx) => {
+      const isExternallySelected = selectedCountryCodes.has(country.country_code);
       const countryNode: TreeNode = {
         id: country.country_code,
         label: country.country,
@@ -241,9 +269,10 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
         y: SVG_HEIGHT - 100,
         children: [],
         countries: [country],
-        isHighlighted: country === winner,
+        isHighlighted: country === winner || isExternallySelected,
         isGreen: (country.renewable_energy_percent || 0) > 50,
         level: 4,
+        countryCode: country.country_code,
       };
       
       // Connect to a random criteria child for visual effect
@@ -257,7 +286,7 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
     });
 
     return root;
-  }, [selections, filteredCountries, winner, greenLevel]);
+  }, [selections, filteredCountries, winner, greenLevel, selectedCountryCodes]);
 
   const handleSelect = (criteriaId: string, value: string) => {
     setSelections(prev => {
@@ -274,23 +303,40 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
     setSelections({});
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setNodeOffsets({});
   };
 
   const handleZoomIn = () => setZoom(z => Math.min(z * 1.2, 3));
   const handleZoomOut = () => setZoom(z => Math.max(z / 1.2, 0.5));
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+    if (dragMode === 'pan') {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     }
   };
 
-  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && dragMode === 'pan') {
+      setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+    }
+    if (draggedNode && dragMode === 'node') {
+      const svgRect = svgRef.current?.getBoundingClientRect();
+      if (svgRect) {
+        const x = (e.clientX - svgRect.left - pan.x) / zoom;
+        const y = (e.clientY - svgRect.top - pan.y) / zoom;
+        setNodeOffsets(prev => ({
+          ...prev,
+          [draggedNode]: { dx: x, dy: y }
+        }));
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDraggedNode(null);
+  };
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -298,11 +344,36 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
     setZoom(z => Math.max(0.5, Math.min(3, z * delta)));
   };
 
+  const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
+    if (dragMode === 'node') {
+      e.stopPropagation();
+      setDraggedNode(nodeId);
+    }
+  };
+
+  const handleNodeClick = (nodeId: string, countryCode?: string) => {
+    if (dragMode === 'node') return;
+    if (countryCode && onCountrySelect) {
+      onCountrySelect(countryCode);
+    }
+  };
+
+  // Get node position with offset
+  const getNodePosition = (node: TreeNode) => {
+    const offset = nodeOffsets[node.id] || { dx: 0, dy: 0 };
+    if (offset.dx !== 0 || offset.dy !== 0) {
+      return { x: offset.dx, y: offset.dy };
+    }
+    return { x: node.x, y: node.y };
+  };
+
   // Render tree connections
   const renderConnections = (node: TreeNode): React.ReactNode[] => {
     const connections: React.ReactNode[] = [];
+    const nodePos = getNodePosition(node);
     
-    node.children.forEach((child, idx) => {
+    node.children.forEach((child) => {
+      const childPos = getNodePosition(child);
       const isHighlightedPath = node.isHighlighted && child.isHighlighted;
       const isGreenPath = node.isGreen || child.isGreen;
       
@@ -311,10 +382,10 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
           {/* Glow effect for green paths */}
           {isGreenPath && (
             <line
-              x1={node.x}
-              y1={node.y + 20}
-              x2={child.x}
-              y2={child.y - 20}
+              x1={nodePos.x}
+              y1={nodePos.y + 20}
+              x2={childPos.x}
+              y2={childPos.y - 20}
               stroke="url(#greenGlow)"
               strokeWidth={isHighlightedPath ? 8 : 4}
               className="animate-pulse"
@@ -322,10 +393,10 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
             />
           )}
           <line
-            x1={node.x}
-            y1={node.y + 20}
-            x2={child.x}
-            y2={child.y - 20}
+            x1={nodePos.x}
+            y1={nodePos.y + 20}
+            x2={childPos.x}
+            y2={childPos.y - 20}
             stroke={isGreenPath ? 'hsl(var(--chart-2))' : isHighlightedPath ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
             strokeWidth={isHighlightedPath ? 3 : 1}
             strokeOpacity={isHighlightedPath ? 1 : 0.3}
@@ -343,25 +414,34 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
   // Render tree nodes
   const renderNodes = (node: TreeNode): React.ReactNode[] => {
     const nodes: React.ReactNode[] = [];
+    const nodePos = getNodePosition(node);
     
     const nodeRadius = node.level === 0 ? 40 : node.level === 4 ? 25 : 30;
     const isGlowing = node.isGreen || (node.level === 0 && greenLevel > 0);
+    const isExternallySelected = node.countryCode && selectedCountryCodes.has(node.countryCode);
+    const isInteractive = node.level === 4 || node.level === 0;
     
     nodes.push(
-      <g key={`node-${node.id}`} className="cursor-pointer">
+      <g 
+        key={`node-${node.id}`} 
+        className={`${isInteractive ? 'cursor-pointer' : ''} ${draggedNode === node.id ? 'opacity-70' : ''}`}
+        onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
+        onClick={() => handleNodeClick(node.id, node.countryCode)}
+        style={{ cursor: dragMode === 'node' ? 'grab' : isInteractive ? 'pointer' : 'default' }}
+      >
         {/* Outer glow for green nodes */}
         {isGlowing && (
           <>
             <circle
-              cx={node.x}
-              cy={node.y}
+              cx={nodePos.x}
+              cy={nodePos.y}
               r={nodeRadius + 15}
               fill="url(#greenRadialGlow)"
               className="animate-pulse"
             />
             <circle
-              cx={node.x}
-              cy={node.y}
+              cx={nodePos.x}
+              cy={nodePos.y}
               r={nodeRadius + 8}
               fill="none"
               stroke="hsl(142, 76%, 36%)"
@@ -371,32 +451,62 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
             />
           </>
         )}
+
+        {/* External selection highlight */}
+        {isExternallySelected && !isGlowing && (
+          <circle
+            cx={nodePos.x}
+            cy={nodePos.y}
+            r={nodeRadius + 10}
+            fill="none"
+            stroke="hsl(var(--chart-3))"
+            strokeWidth={3}
+            strokeDasharray="5,5"
+            className="animate-pulse"
+          />
+        )}
         
         {/* Node circle */}
         <circle
-          cx={node.x}
-          cy={node.y}
+          cx={nodePos.x}
+          cy={nodePos.y}
           r={nodeRadius}
-          fill={isGlowing ? 'url(#greenGradient)' : node.isHighlighted ? 'hsl(var(--primary))' : 'hsl(var(--muted))'}
-          stroke={isGlowing ? 'hsl(142, 76%, 50%)' : node.isHighlighted ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
-          strokeWidth={node.isHighlighted ? 3 : 1}
-          className={`transition-all duration-300 ${node.isHighlighted ? 'drop-shadow-lg' : ''}`}
+          fill={
+            isGlowing 
+              ? 'url(#greenGradient)' 
+              : isExternallySelected 
+                ? 'hsl(var(--chart-3))' 
+                : node.isHighlighted 
+                  ? 'hsl(var(--primary))' 
+                  : 'hsl(var(--muted))'
+          }
+          stroke={
+            isGlowing 
+              ? 'hsl(142, 76%, 50%)' 
+              : isExternallySelected
+                ? 'hsl(var(--chart-3))'
+                : node.isHighlighted 
+                  ? 'hsl(var(--primary))' 
+                  : 'hsl(var(--border))'
+          }
+          strokeWidth={node.isHighlighted || isExternallySelected ? 3 : 1}
+          className={`transition-all duration-300 ${node.isHighlighted || isExternallySelected ? 'drop-shadow-lg' : ''}`}
         />
         
         {/* Leaf icon for green nodes */}
         {isGlowing && node.level === 0 && (
-          <g transform={`translate(${node.x - 12}, ${node.y - 25})`}>
+          <g transform={`translate(${nodePos.x - 12}, ${nodePos.y - 25})`}>
             <Leaf className="w-6 h-6 text-white animate-bounce" />
           </g>
         )}
         
         {/* Node label */}
         <text
-          x={node.x}
-          y={node.level === 4 ? node.y + nodeRadius + 15 : node.y + 4}
+          x={nodePos.x}
+          y={node.level === 4 ? nodePos.y + nodeRadius + 15 : nodePos.y + 4}
           textAnchor="middle"
           fontSize={node.level === 0 ? 14 : node.level === 4 ? 10 : 11}
-          fontWeight={node.isHighlighted ? 'bold' : 'normal'}
+          fontWeight={node.isHighlighted || isExternallySelected ? 'bold' : 'normal'}
           fill={node.level === 4 || (node.level !== 0 && !node.isHighlighted) ? 'hsl(var(--foreground))' : 'white'}
           className="pointer-events-none"
         >
@@ -432,8 +542,21 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
                 {greenLevel} Green Choice{greenLevel > 1 ? 's' : ''}
               </Badge>
             )}
+            {selectedCountryCodes.size > 0 && (
+              <Badge variant="outline" className="bg-chart-3/20 text-chart-3 border-chart-3/50">
+                {selectedCountryCodes.size} selected from charts
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant={dragMode === 'node' ? 'default' : 'outline'} 
+              size="icon" 
+              onClick={() => setDragMode(dragMode === 'node' ? 'pan' : 'node')}
+              title={dragMode === 'node' ? 'Node drag mode' : 'Pan mode'}
+            >
+              <Hand className="w-4 h-4" />
+            </Button>
             <Button variant="outline" size="icon" onClick={handleZoomOut}>
               <ZoomOut className="w-4 h-4" />
             </Button>
@@ -479,10 +602,22 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
           ))}
         </div>
 
+        {/* Mode indicator */}
+        <div className="flex items-center gap-2 text-sm">
+          <Badge variant={dragMode === 'node' ? 'default' : 'secondary'}>
+            {dragMode === 'node' ? '🖐️ Drag nodes to move them' : '🗺️ Pan mode - drag to navigate'}
+          </Badge>
+          <span className="text-muted-foreground">
+            Click country nodes to select • Select in charts to filter tree
+          </span>
+        </div>
+
         {/* Interactive Tree Visualization */}
         <div
           ref={containerRef}
-          className="relative h-[500px] border rounded-lg overflow-hidden bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"
+          className={`relative h-[500px] border rounded-lg overflow-hidden bg-background/50 backdrop-blur-sm ${
+            dragMode === 'pan' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+          }`}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -497,7 +632,7 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: 'center center',
-              transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+              transition: isDragging || draggedNode ? 'none' : 'transform 0.1s ease-out',
             }}
           >
             {/* Gradient definitions */}
@@ -573,6 +708,7 @@ const InteractiveDecisionTree: React.FC<InteractiveDecisionTreeProps> = ({ data 
             </p>
             <p className="text-sm text-muted-foreground mt-2">
               {filteredCountries.length} countries match your criteria
+              {selectedCountryCodes.size > 0 && ` (from ${selectedCountryCodes.size} selected in charts)`}
             </p>
           </div>
         )}
