@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
-import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceArea } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { X, Grid2X2, Grid3X3, Square } from "lucide-react";
+import { X, Grid2X2, Grid3X3, Square, MousePointer2 } from "lucide-react";
 
 interface ScatterPlotMatrixProps {
   data: CountryData[];
@@ -49,6 +49,12 @@ export const ScatterPlotMatrix = ({
     "co2_per_capita_tonnes",
     "internet_users_per_100",
   ]);
+  const [brushMode, setBrushMode] = useState(false);
+  
+  // Brush state for each cell
+  const [brushingCell, setBrushingCell] = useState<string | null>(null);
+  const [brushStart, setBrushStart] = useState<{ x: number; y: number } | null>(null);
+  const [brushEnd, setBrushEnd] = useState<{ x: number; y: number } | null>(null);
 
   const gridSize = matrixSize === "1x1" ? 1 : matrixSize === "2x2" ? 2 : 3;
   const requiredAttributes = gridSize;
@@ -124,6 +130,40 @@ export const ScatterPlotMatrix = ({
     return attributeOptions.find(a => a.key === key)?.label || String(key);
   };
 
+  // Handle brush selection for a cell
+  const handleBrushSelect = useCallback((
+    cellKey: string,
+    xAttr: keyof CountryData,
+    yAttr: keyof CountryData,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number
+  ) => {
+    if (!onBrushSelection) return;
+    
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    
+    const selectedCodes = new Set(highlightedCountries);
+    
+    data.forEach(country => {
+      const xVal = country[xAttr];
+      const yVal = country[yAttr];
+      
+      if (typeof xVal === "number" && typeof yVal === "number" &&
+          !isNaN(xVal) && !isNaN(yVal) &&
+          xVal >= minX && xVal <= maxX &&
+          yVal >= minY && yVal <= maxY) {
+        selectedCodes.add(country.countryCode);
+      }
+    });
+    
+    onBrushSelection(selectedCodes);
+  }, [data, highlightedCountries, onBrushSelection]);
+
   // Generate matrix cells
   const renderMatrix = () => {
     const cells: JSX.Element[] = [];
@@ -133,12 +173,13 @@ export const ScatterPlotMatrix = ({
       for (let col = 0; col < gridSize; col++) {
         const xAttr = activeAttributes[col];
         const yAttr = activeAttributes[row];
+        const cellKey = `${row}-${col}`;
         
         // Diagonal: show attribute name
         if (row === col) {
           cells.push(
             <div
-              key={`${row}-${col}`}
+              key={cellKey}
               className="flex items-center justify-center bg-muted/30 rounded-lg border border-border/50"
               style={{ height: cellHeight }}
             >
@@ -147,14 +188,45 @@ export const ScatterPlotMatrix = ({
           );
         } else {
           const scatterData = getScatterData(xAttr, yAttr);
+          const isBrushingThisCell = brushingCell === cellKey;
+          
           cells.push(
             <div
-              key={`${row}-${col}`}
+              key={cellKey}
               className="relative"
               style={{ height: cellHeight }}
             >
               <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 5, right: 5, bottom: 20, left: 25 }}>
+                <ScatterChart 
+                  margin={{ top: 5, right: 5, bottom: 20, left: 25 }}
+                  onMouseDown={(e) => {
+                    if (brushMode && e?.xValue !== undefined && e?.yValue !== undefined) {
+                      setBrushingCell(cellKey);
+                      setBrushStart({ x: e.xValue, y: e.yValue });
+                      setBrushEnd({ x: e.xValue, y: e.yValue });
+                    }
+                  }}
+                  onMouseMove={(e) => {
+                    if (brushMode && isBrushingThisCell && brushStart && e?.xValue !== undefined && e?.yValue !== undefined) {
+                      setBrushEnd({ x: e.xValue, y: e.yValue });
+                    }
+                  }}
+                  onMouseUp={() => {
+                    if (brushMode && isBrushingThisCell && brushStart && brushEnd) {
+                      handleBrushSelect(cellKey, xAttr, yAttr, brushStart.x, brushStart.y, brushEnd.x, brushEnd.y);
+                      setBrushingCell(null);
+                      setBrushStart(null);
+                      setBrushEnd(null);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (isBrushingThisCell) {
+                      setBrushingCell(null);
+                      setBrushStart(null);
+                      setBrushEnd(null);
+                    }
+                  }}
+                >
                   <XAxis
                     type="number"
                     dataKey="x"
@@ -184,6 +256,21 @@ export const ScatterPlotMatrix = ({
                       fill: "hsl(var(--muted-foreground))",
                     } : undefined}
                   />
+                  
+                  {/* Brush selection rectangle */}
+                  {isBrushingThisCell && brushStart && brushEnd && (
+                    <ReferenceArea
+                      x1={brushStart.x}
+                      x2={brushEnd.x}
+                      y1={brushStart.y}
+                      y2={brushEnd.y}
+                      strokeOpacity={0.8}
+                      stroke="hsl(var(--primary))"
+                      fill="hsl(var(--primary))"
+                      fillOpacity={0.2}
+                    />
+                  )}
+                  
                   <Tooltip
                     cursor={{ strokeDasharray: "3 3" }}
                     contentStyle={{
@@ -198,21 +285,28 @@ export const ScatterPlotMatrix = ({
                   <Scatter
                     data={scatterData}
                     onClick={(data) => {
-                      const entry = data as typeof scatterData[0];
-                      if (entry?.country) handlePointClick(entry.country);
+                      if (!brushMode) {
+                        const entry = data as typeof scatterData[0];
+                        if (entry?.country) handlePointClick(entry.country);
+                      }
                     }}
                   >
                     {scatterData.map((entry) => (
                       <Cell
                         key={entry.country.countryCode}
                         fill={getPointColor(entry.country.countryCode)}
-                        style={{ cursor: "pointer" }}
+                        style={{ cursor: brushMode ? "crosshair" : "pointer" }}
                         r={matrixSize === "3x3" ? 3 : matrixSize === "2x2" ? 4 : 6}
                       />
                     ))}
                   </Scatter>
                 </ScatterChart>
               </ResponsiveContainer>
+              
+              {/* Brush mode overlay indicator */}
+              {brushMode && (
+                <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-primary/30 rounded" />
+              )}
             </div>
           );
         }
@@ -227,7 +321,10 @@ export const ScatterPlotMatrix = ({
         <div>
           <h3 className="text-lg font-bold">Scatter Plot Matrix (SPLOM)</h3>
           <p className="text-sm text-muted-foreground">
-            Compare multiple attribute pairs. Click points to select countries.
+            {brushMode 
+              ? "Drag to select countries in a region. Click points to toggle." 
+              : "Click points to select. Enable brush mode to drag-select."
+            }
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -237,6 +334,16 @@ export const ScatterPlotMatrix = ({
               Clear ({highlightedCountries?.size})
             </Button>
           )}
+          <Button
+            variant={brushMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setBrushMode(!brushMode)}
+            className="gap-1"
+            title="Toggle brush selection mode"
+          >
+            <MousePointer2 className="h-4 w-4" />
+            {brushMode ? "Brush On" : "Brush"}
+          </Button>
           <div className="flex items-center border rounded-lg overflow-hidden">
             <Button
               variant={matrixSize === "1x1" ? "default" : "ghost"}
