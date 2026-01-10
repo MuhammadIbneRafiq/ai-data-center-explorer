@@ -67,4 +67,5 @@ export interface FilterState {
   gdp: [number, number];
   internetSpeed: [number, number];
   selectedMetric: string;
+  selectedCountries: string[]; // Country codes for filtering
 }

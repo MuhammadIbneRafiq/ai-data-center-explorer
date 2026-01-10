@@ -1,15 +1,17 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X } from "lucide-react";
+import { X, MousePointer2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface InteractiveParallelCoordinatesProps {
   data: CountryData[];
   selectedCountries?: CountryData[];
   onCountrySelect?: (country: CountryData) => void;
   highlightedCountries?: Set<string>;
+  onMultiSelect?: (countryCodes: Set<string>) => void;
 }
 
 interface Attribute {
@@ -59,6 +61,7 @@ export const InteractiveParallelCoordinates = ({
   selectedCountries,
   onCountrySelect,
   highlightedCountries,
+  onMultiSelect,
 }: InteractiveParallelCoordinatesProps) => {
   const [selectedAttributes, setSelectedAttributes] = useState<Attribute[]>([
     availableAttributes.find(a => a.key === "Real_GDP_per_Capita_USD")!,
@@ -72,6 +75,8 @@ export const InteractiveParallelCoordinates = ({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(true);
+  const [localSelection, setLocalSelection] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -164,18 +169,48 @@ export const InteractiveParallelCoordinates = ({
     });
   }, [data, selectedAttributes]);
 
+  // Sync local selection with external highlighted countries
+  useEffect(() => {
+    if (highlightedCountries) {
+      setLocalSelection(new Set(highlightedCountries));
+    }
+  }, [highlightedCountries]);
+
+  const handleLineClick = useCallback((country: CountryData) => {
+    if (isMultiSelectMode) {
+      const newSelection = new Set(localSelection);
+      if (newSelection.has(country.countryCode)) {
+        newSelection.delete(country.countryCode);
+      } else {
+        newSelection.add(country.countryCode);
+      }
+      setLocalSelection(newSelection);
+      onMultiSelect?.(newSelection);
+    }
+    onCountrySelect?.(country);
+  }, [isMultiSelectMode, localSelection, onMultiSelect, onCountrySelect]);
+
+  const handleClearSelection = useCallback(() => {
+    setLocalSelection(new Set());
+    onMultiSelect?.(new Set());
+  }, [onMultiSelect]);
+
   const margin = { top: 60, right: 40, bottom: 40, left: 40 };
   const width = dimensions.width - margin.left - margin.right;
   const height = dimensions.height - margin.top - margin.bottom;
   
   const axisSpacing = width / (selectedAttributes.length - 1 || 1);
 
+  const effectiveSelection = highlightedCountries && highlightedCountries.size > 0 
+    ? highlightedCountries 
+    : localSelection;
+
   const getLineColor = (countryCode: string) => {
     if (hoveredCountry === countryCode) {
       return "hsl(var(--chart-3))";
     }
-    if (highlightedCountries && highlightedCountries.size > 0) {
-      return highlightedCountries.has(countryCode) 
+    if (effectiveSelection.size > 0) {
+      return effectiveSelection.has(countryCode) 
         ? "hsl(var(--chart-1))" 
         : "hsl(var(--muted-foreground) / 0.1)";
     }
@@ -187,7 +222,7 @@ export const InteractiveParallelCoordinates = ({
 
   const getLineWidth = (countryCode: string) => {
     if (hoveredCountry === countryCode) return 3;
-    if (highlightedCountries && highlightedCountries.has(countryCode)) return 2;
+    if (effectiveSelection.has(countryCode)) return 2;
     if (selectedCountries && selectedCountries.some(c => c.countryCode === countryCode)) return 2;
     return 1;
   };
@@ -204,29 +239,69 @@ export const InteractiveParallelCoordinates = ({
 
   return (
     <Card className="glass-panel p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h3 className="text-lg font-bold">Interactive Parallel Coordinates</h3>
           <p className="text-sm text-muted-foreground">
-            Compare multiple attributes. Click lines to select countries.
+            Click lines to select multiple countries. Shift+click for single select.
           </p>
         </div>
         
-        <Select onValueChange={addAttribute}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Add attribute..." />
-          </SelectTrigger>
-          <SelectContent>
-            {availableAttributes
-              .filter(attr => !selectedAttributes.find(a => a.key === attr.key))
-              .map(attr => (
-                <SelectItem key={attr.key} value={attr.key}>
-                  {attr.label}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          {effectiveSelection.size > 0 && (
+            <Button variant="outline" size="sm" onClick={handleClearSelection} className="gap-1">
+              <X className="h-4 w-4" />
+              Clear ({effectiveSelection.size})
+            </Button>
+          )}
+          <Button
+            variant={isMultiSelectMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
+            className="gap-1"
+          >
+            <MousePointer2 className="h-4 w-4" />
+            Multi-Select
+          </Button>
+          <Select onValueChange={addAttribute}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Add attribute..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableAttributes
+                .filter(attr => !selectedAttributes.find(a => a.key === attr.key))
+                .map(attr => (
+                  <SelectItem key={attr.key} value={attr.key}>
+                    {attr.label}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {/* Selected countries badges */}
+      {effectiveSelection.size > 0 && (
+        <div className="flex flex-wrap gap-1 p-2 bg-muted/30 rounded-lg">
+          {Array.from(effectiveSelection).slice(0, 8).map(code => {
+            const country = data.find(c => c.countryCode === code);
+            return (
+              <Badge
+                key={code}
+                variant="secondary"
+                className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground text-xs"
+                onClick={() => handleLineClick(country!)}
+              >
+                {country?.country?.slice(0, 15) || code}
+                <X className="h-3 w-3 ml-1" />
+              </Badge>
+            );
+          })}
+          {effectiveSelection.size > 8 && (
+            <Badge variant="outline" className="text-xs">+{effectiveSelection.size - 8} more</Badge>
+          )}
+        </div>
+      )}
 
       {/* Selected attributes chips - draggable */}
       <div className="flex flex-wrap gap-2">
@@ -335,7 +410,7 @@ export const InteractiveParallelCoordinates = ({
                 opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
                 onMouseEnter={() => setHoveredCountry(country.countryCode)}
                 onMouseLeave={() => setHoveredCountry(null)}
-                onClick={() => onCountrySelect && onCountrySelect(country)}
+                onClick={() => handleLineClick(country)}
                 style={{ cursor: 'pointer', transition: 'all 0.2s' }}
               >
                 <title>{country.country}</title>
