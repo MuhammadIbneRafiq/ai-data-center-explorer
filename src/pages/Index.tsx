@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, ReactNode } from "react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
-import { FilterPanel } from "@/components/dashboard/FilterPanel";
+import { CollapsibleFilterPanel } from "@/components/dashboard/CollapsibleFilterPanel";
 import InteractiveDecisionTree from "@/components/dashboard/InteractiveDecisionTree";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
 import { SpiderChart } from "@/components/dashboard/SpiderChart";
 import { InteractiveParallelCoordinates } from "@/components/dashboard/InteractiveParallelCoordinates";
-import { EnhancedScatterPlot } from "@/components/dashboard/EnhancedScatterPlot";
+import { ScatterPlotMatrix } from "@/components/dashboard/ScatterPlotMatrix";
 import { IntroTutorial } from "@/components/dashboard/IntroTutorial";
 import { DraggableSection } from "@/components/dashboard/DraggableSection";
 import { CountryData, FilterState } from "@/types/country-data";
@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 // Section IDs for drag and drop
-type SectionId = "decision" | "filters" | "details" | "barchart" | "spider" | "scatter" | "parallel";
+type SectionId = "decision" | "details" | "barchart" | "spider" | "scatter" | "parallel";
 
 const Index = () => {
   const [filters, setFilters] = useState<FilterState>({
@@ -27,6 +27,7 @@ const Index = () => {
     gdp: [0, 100000],
     internetSpeed: [0, 1000],
     selectedMetric: "renewableEnergyPercent",
+    selectedCountries: [],
   });
 
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
@@ -38,7 +39,7 @@ const Index = () => {
   const { toast } = useToast();
 
   // Draggable layout state - unified grid with all sections same size
-  const defaultSectionOrder: SectionId[] = ["decision", "filters", "details", "barchart", "spider", "scatter", "parallel"];
+  const defaultSectionOrder: SectionId[] = ["decision", "details", "barchart", "spider", "scatter", "parallel"];
   const [sectionOrder, setSectionOrder] = useState<SectionId[]>(defaultSectionOrder);
   const [draggedSection, setDraggedSection] = useState<SectionId | null>(null);
   const [dragOverSection, setDragOverSection] = useState<SectionId | null>(null);
@@ -234,7 +235,14 @@ const Index = () => {
   return (
     <>
       <IntroTutorial />
-      <div className="min-h-screen bg-background p-4 pb-10 space-y-6">
+      <CollapsibleFilterPanel
+        filters={filters}
+        onFilterChange={setFilters}
+        countryData={countryData}
+        highlightedCountries={highlightedCountries}
+        onHighlightedCountriesChange={setHighlightedCountries}
+      />
+      <div className="min-h-screen bg-background p-4 pb-10 pr-14 space-y-6">
         {/* Header */}
         <header className="flex items-center justify-between">
           <div className="flex-1">
@@ -329,11 +337,6 @@ const Index = () => {
                   />
                 </div>
               ),
-              filters: (
-                <div className="h-full min-h-[420px]">
-                  <FilterPanel filters={filters} onFilterChange={setFilters} />
-                </div>
-              ),
               details: (
                 <div className="h-full min-h-[420px]">
                   {selectedCountry ? (
@@ -375,7 +378,7 @@ const Index = () => {
                 />
               ),
               scatter: (
-                <EnhancedScatterPlot
+                <ScatterPlotMatrix
                   data={filteredData}
                   activeCountry={selectedCountry}
                   onCountrySelect={handleChartCountrySelect}
@@ -389,6 +392,7 @@ const Index = () => {
                   selectedCountries={selectedCountry ? [selectedCountry] : []}
                   onCountrySelect={handleChartCountrySelect}
                   highlightedCountries={highlightedCountries}
+                  onMultiSelect={setHighlightedCountries}
                 />
               ),
             };

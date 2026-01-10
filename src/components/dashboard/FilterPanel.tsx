@@ -19,6 +19,7 @@ export const FilterPanel = ({ filters, onFilterChange }: FilterPanelProps) => {
       gdp: [0, 100000],
       internetSpeed: [0, 1000],
       selectedMetric: "renewableEnergyPercent",
+      selectedCountries: [],
     });
   };
 
