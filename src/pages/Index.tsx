@@ -1,23 +1,24 @@
-import { useState, useEffect, useCallback, ReactNode } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { CollapsibleFilterPanel } from "@/components/dashboard/CollapsibleFilterPanel";
-import InteractiveDecisionTree from "@/components/dashboard/InteractiveDecisionTree";
-import { StatsCard } from "@/components/dashboard/StatsCard";
-import { CountryDetail } from "@/components/dashboard/CountryDetail";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
 import { SpiderChart } from "@/components/dashboard/SpiderChart";
 import { InteractiveParallelCoordinates } from "@/components/dashboard/InteractiveParallelCoordinates";
 import { ScatterPlotMatrix } from "@/components/dashboard/ScatterPlotMatrix";
 import { IntroTutorial } from "@/components/dashboard/IntroTutorial";
-import { DraggableSection } from "@/components/dashboard/DraggableSection";
 import { CountryData, FilterState } from "@/types/country-data";
-import { Database, Globe, Zap, TrendingUp, Upload, RotateCcw, Move } from "lucide-react";
+import { Upload, RotateCcw, Move } from "lucide-react";
 import { fetchCountryData } from "@/lib/supabase-data";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 
-// Section IDs for drag and drop
-type SectionId = "decision" | "details" | "barchart" | "spider" | "scatter" | "parallel";
+// Section IDs for resizable panels
+type SectionId = "barchart" | "spider" | "scatter" | "parallel";
 
 const Index = () => {
   const [filters, setFilters] = useState<FilterState>({
@@ -35,58 +36,22 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
   const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
-  const [treeFilteredCountries, setTreeFilteredCountries] = useState<string[]>([]);
   const { toast } = useToast();
 
-  // Draggable layout state - unified grid with all sections same size
-  const defaultSectionOrder: SectionId[] = ["decision", "details", "barchart", "spider", "scatter", "parallel"];
-  const [sectionOrder, setSectionOrder] = useState<SectionId[]>(defaultSectionOrder);
-  const [draggedSection, setDraggedSection] = useState<SectionId | null>(null);
-  const [dragOverSection, setDragOverSection] = useState<SectionId | null>(null);
-
-  // Drag handlers for reordering sections
-  const handleDragStart = useCallback((id: SectionId) => {
-    setDraggedSection(id);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent, id: SectionId) => {
-    e.preventDefault();
-    if (draggedSection && draggedSection !== id) {
-      setDragOverSection(id);
-    }
-  }, [draggedSection]);
-
-  const handleDrop = useCallback((targetId: SectionId) => {
-    if (!draggedSection || draggedSection === targetId) {
-      setDraggedSection(null);
-      setDragOverSection(null);
-      return;
-    }
-
-    // Unified grid - any section can swap with any other
-    setSectionOrder((prevOrder) => {
-      const newOrder = [...prevOrder];
-      const draggedIndex = newOrder.indexOf(draggedSection);
-      const targetIndex = newOrder.indexOf(targetId);
-      
-      if (draggedIndex !== -1 && targetIndex !== -1) {
-        // Swap the two sections
-        newOrder[draggedIndex] = targetId;
-        newOrder[targetIndex] = draggedSection;
-      }
-      
-      return newOrder;
-    });
-
-    setDraggedSection(null);
-    setDragOverSection(null);
-  }, [draggedSection]);
+  // Panel sizes state for resizable panels
+  const [panelSizes, setPanelSizes] = useState({
+    topRow: [50, 50],
+    bottomRow: [50, 50],
+  });
 
   const resetLayout = useCallback(() => {
-    setSectionOrder(defaultSectionOrder);
+    setPanelSizes({
+      topRow: [50, 50],
+      bottomRow: [50, 50],
+    });
     toast({
       title: "Layout Reset",
-      description: "Dashboard layout has been reset to default.",
+      description: "Panel sizes have been reset to default.",
     });
   }, [toast]);
 
@@ -162,14 +127,6 @@ const Index = () => {
     return true;
   });
 
-  const safeAverage = (values: Array<number | undefined>): number | undefined => {
-    const nums = values.filter((v): v is number => typeof v === "number" && !Number.isNaN(v));
-    if (nums.length === 0) return undefined;
-    return nums.reduce((sum, v) => sum + v, 0) / nums.length;
-  };
-
-  const avgRenewable = safeAverage(filteredData.map((c) => c.renewableEnergyPercent));
-  const avgInternetMetric = safeAverage(filteredData.map((c) => c.internetSpeed));
 
   const handleSpiderCountrySelect = (
     country: CountryData,
@@ -193,30 +150,7 @@ const Index = () => {
     setCompareCountries(countries);
   };
 
-  // Bidirectional: when tree filters countries, update highlighted
-  const handleTreeCountriesFilter = useCallback((countryCodes: string[]) => {
-    setTreeFilteredCountries(countryCodes);
-  }, []);
-
-  // Bidirectional: when country selected in tree, update main selection
-  const handleTreeCountrySelect = useCallback((countryCode: string) => {
-    const country = countryData.find(c => c.countryCode === countryCode);
-    if (country) {
-      setSelectedCountry(country);
-      // Also add to highlighted
-      setHighlightedCountries(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(countryCode)) {
-          newSet.delete(countryCode);
-        } else {
-          newSet.add(countryCode);
-        }
-        return newSet;
-      });
-    }
-  }, [countryData]);
-
-  // Handle country selection from charts - adds to highlighted set for tree
+  // Handle country selection from charts
   const handleChartCountrySelect = useCallback((country: CountryData) => {
     setSelectedCountry(country);
   }, []);
@@ -279,138 +213,93 @@ const Index = () => {
         {/* Layout hint */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
           <Move className="h-4 w-4" />
-          <span>Drag charts by their left handle to rearrange • Select countries in charts to filter the decision tree • Click tree nodes to highlight in charts</span>
+          <span>Drag panel edges to resize • Select countries in charts to highlight across all visualizations</span>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Total Countries Analyzed"
-            value={countryData.length}
-            icon={Globe}
-            subtitle="Loaded from database / CSV"
-          />
-          <StatsCard
-            title="Filtered Results"
-            value={filteredData.length}
-            icon={Database}
-            subtitle="Matching current filters"
-          />
-          <StatsCard
-            title="Avg Renewable Energy %"
-            value={
-              avgRenewable !== undefined ? `${avgRenewable.toFixed(1)}%` : "N/A"
-            }
-            icon={TrendingUp}
-            subtitle="Across filtered countries"
-          />
-          <StatsCard
-            title="Avg Internet Metric"
-            value={
-              avgInternetMetric !== undefined ? avgInternetMetric.toFixed(1) : "N/A"
-            }
-            icon={Zap}
-            subtitle="Higher means better connectivity"
-          />
-        </div>
-
-        {/* Unified Draggable Grid - All sections same size */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {sectionOrder.map((sectionId) => {
-            const allComponents: Record<SectionId, ReactNode> = {
-              decision: (
-                <div className="h-full min-h-[600px]">
-                  <InteractiveDecisionTree
-                    data={filteredData.map(c => ({
-                      country: c.country,
-                      country_code: c.countryCode,
-                      renewable_energy_percent: c.renewableEnergyPercent ?? null,
-                      electricity_cost: c.electricityCost ?? null,
-                      average_temperature: c.averageTemperature ?? null,
-                      connectivity_score: c.internet_users_per_100 ?? null,
-                      gdp_per_capita: c.gdpPerCapita ?? null,
-                      overall_datacenter_score: c.renewableEnergyPercent ?? null,
-                    }))}
-                    selectedCountryCodes={highlightedCountries}
-                    onCountrySelect={handleTreeCountrySelect}
-                    onCountriesFilter={handleTreeCountriesFilter}
-                  />
-                </div>
-              ),
-              details: (
-                <div className="h-full min-h-[420px]">
-                  {selectedCountry ? (
-                    <CountryDetail
-                      country={selectedCountry}
-                      onClose={() => setSelectedCountry(null)}
+        {/* Resizable Panel Grid */}
+        <div className="flex-1 min-h-[800px]">
+          <ResizablePanelGroup
+            direction="vertical"
+            className="min-h-[800px] rounded-lg border"
+          >
+            {/* Top Row */}
+            <ResizablePanel defaultSize={50} minSize={25}>
+              <ResizablePanelGroup direction="horizontal">
+                <ResizablePanel 
+                  defaultSize={panelSizes.topRow[0]} 
+                  minSize={20}
+                  onResize={(size) => setPanelSizes(prev => ({ ...prev, topRow: [size, 100 - size] }))}
+                >
+                  <div className="h-full p-2">
+                    <TopCountriesChart
+                      data={filteredData}
+                      metric={filters.selectedMetric as keyof CountryData}
+                      activeCountry={selectedCountry}
+                      onCountrySelect={handleChartCountrySelect}
+                      highlightedCountries={highlightedCountries}
+                      onBrushSelection={setHighlightedCountries}
                     />
-                  ) : (
-                    <div className="glass-panel p-6 h-full flex items-center justify-center text-center">
-                      <div className="space-y-3">
-                        <Globe className="h-12 w-12 mx-auto text-muted-foreground" />
-                        <p className="text-lg font-medium">Select a Country</p>
-                        <p className="text-sm text-muted-foreground">
-                          Click on any marker on the map to view detailed analytics
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ),
-              barchart: (
-                <TopCountriesChart
-                  data={filteredData}
-                  metric={filters.selectedMetric as keyof CountryData}
-                  activeCountry={selectedCountry}
-                  onCountrySelect={handleChartCountrySelect}
-                  highlightedCountries={highlightedCountries}
-                  onBrushSelection={setHighlightedCountries}
-                />
-              ),
-              spider: (
-                <SpiderChart
-                  data={filteredData}
-                  selectedCountry={selectedCountry}
-                  compareCountries={compareCountries}
-                  onCountrySelect={handleSpiderCountrySelect}
-                  onClearComparison={() => setCompareCountries([])}
-                  onCompareCountriesChange={handleCompareCountriesChange}
-                />
-              ),
-              scatter: (
-                <ScatterPlotMatrix
-                  data={filteredData}
-                  activeCountry={selectedCountry}
-                  onCountrySelect={handleChartCountrySelect}
-                  highlightedCountries={highlightedCountries}
-                  onBrushSelection={setHighlightedCountries}
-                />
-              ),
-              parallel: (
-                <InteractiveParallelCoordinates
-                  data={filteredData}
-                  selectedCountries={selectedCountry ? [selectedCountry] : []}
-                  onCountrySelect={handleChartCountrySelect}
-                  highlightedCountries={highlightedCountries}
-                  onMultiSelect={setHighlightedCountries}
-                />
-              ),
-            };
-
-            return (
-              <DraggableSection
-                key={sectionId}
-                id={sectionId}
-                onDragStart={(id) => handleDragStart(id as SectionId)}
-                onDragOver={(e, id) => handleDragOver(e, id as SectionId)}
-                onDrop={(id) => handleDrop(id as SectionId)}
-                isDragging={draggedSection === sectionId}
-                isDragOver={dragOverSection === sectionId}
-              >
-                {allComponents[sectionId]}
-              </DraggableSection>
-            );
-          })}
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel 
+                  defaultSize={panelSizes.topRow[1]} 
+                  minSize={20}
+                  onResize={(size) => setPanelSizes(prev => ({ ...prev, topRow: [100 - size, size] }))}
+                >
+                  <div className="h-full p-2">
+                    <SpiderChart
+                      data={filteredData}
+                      selectedCountry={selectedCountry}
+                      compareCountries={compareCountries}
+                      onCountrySelect={handleSpiderCountrySelect}
+                      onClearComparison={() => setCompareCountries([])}
+                      onCompareCountriesChange={handleCompareCountriesChange}
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            </ResizablePanel>
+            
+            <ResizableHandle withHandle />
+            
+            {/* Bottom Row */}
+            <ResizablePanel defaultSize={50} minSize={25}>
+              <ResizablePanelGroup direction="horizontal">
+                <ResizablePanel 
+                  defaultSize={panelSizes.bottomRow[0]} 
+                  minSize={20}
+                  onResize={(size) => setPanelSizes(prev => ({ ...prev, bottomRow: [size, 100 - size] }))}
+                >
+                  <div className="h-full p-2">
+                    <ScatterPlotMatrix
+                      data={filteredData}
+                      activeCountry={selectedCountry}
+                      onCountrySelect={handleChartCountrySelect}
+                      highlightedCountries={highlightedCountries}
+                      onBrushSelection={setHighlightedCountries}
+                    />
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel 
+                  defaultSize={panelSizes.bottomRow[1]} 
+                  minSize={20}
+                  onResize={(size) => setPanelSizes(prev => ({ ...prev, bottomRow: [100 - size, size] }))}
+                >
+                  <div className="h-full p-2">
+                    <InteractiveParallelCoordinates
+                      data={filteredData}
+                      selectedCountries={selectedCountry ? [selectedCountry] : []}
+                      onCountrySelect={handleChartCountrySelect}
+                      highlightedCountries={highlightedCountries}
+                      onMultiSelect={setHighlightedCountries}
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
       </div>
     </>
