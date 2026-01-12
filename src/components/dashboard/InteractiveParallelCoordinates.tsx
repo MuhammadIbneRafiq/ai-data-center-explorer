@@ -3,8 +3,8 @@ import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, MousePointer2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { X, MousePointer2, Maximize2 } from "lucide-react";
+import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface InteractiveParallelCoordinatesProps {
   data: CountryData[];
@@ -77,6 +77,7 @@ export const InteractiveParallelCoordinates = ({
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(true);
   const [localSelection, setLocalSelection] = useState<Set<string>>(new Set());
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -242,145 +243,157 @@ export const InteractiveParallelCoordinates = ({
     return `M ${points.join(' L ')}`;
   };
 
+  const parallelContent = (fullscreen = false) => (
+    <div className={`relative ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
+      <svg
+        ref={!fullscreen ? svgRef : undefined}
+        width="100%"
+        height="100%"
+        className="overflow-visible"
+      >
+        <g transform={`translate(${margin.left}, ${margin.top})`}>
+          {/* Draw axes */}
+          {selectedAttributes.map((attr, i) => {
+            const x = i * axisSpacing;
+            
+            return (
+              <g key={attr.key}>
+                {/* Axis line */}
+                <line
+                  x1={x}
+                  y1={0}
+                  x2={x}
+                  y2={height}
+                  stroke="hsl(var(--border))"
+                  strokeWidth={2}
+                />
+                
+                {/* Axis label */}
+                <text
+                  x={x}
+                  y={-10}
+                  textAnchor="middle"
+                  fill="hsl(var(--foreground))"
+                  fontSize={fullscreen ? 14 : 12}
+                  fontWeight="600"
+                >
+                  {attr.label}
+                </text>
+                
+                {/* Min/Max labels */}
+                <text
+                  x={x}
+                  y={height + 20}
+                  textAnchor="middle"
+                  fill="hsl(var(--muted-foreground))"
+                  fontSize={fullscreen ? 12 : 10}
+                >
+                  Min
+                </text>
+                <text
+                  x={x}
+                  y={-25}
+                  textAnchor="middle"
+                  fill="hsl(var(--muted-foreground))"
+                  fontSize={fullscreen ? 12 : 10}
+                >
+                  Max
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Draw lines for each country */}
+          {normalizedData.map(({ country, normalized }) => (
+            <path
+              key={country.countryCode}
+              d={generatePath(normalized)}
+              fill="none"
+              stroke={getLineColor(country.countryCode)}
+              strokeWidth={getLineWidth(country.countryCode)}
+              opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
+              onMouseEnter={() => setHoveredCountry(country.countryCode)}
+              onMouseLeave={() => setHoveredCountry(null)}
+              onClick={() => handleLineClick(country)}
+              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              <title>{country.country}</title>
+            </path>
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+
   return (
-    <Card className="glass-panel p-3 h-full flex flex-col">
-      <div className="flex items-center justify-between gap-1 mb-1 flex-shrink-0 flex-wrap">
-        <h3 className="text-sm font-semibold">Parallel Coords</h3>
-        <div className="flex items-center gap-1">
-          {effectiveSelection.size > 0 && (
-            <Button variant="outline" size="sm" onClick={handleClearSelection} className="h-6 text-xs px-2">
-              <X className="h-3 w-3 mr-1" />{effectiveSelection.size}
-            </Button>
-          )}
-          <Button
-            variant={isMultiSelectMode ? "default" : "outline"}
-            size="sm"
-            onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
-            className="h-6 text-xs px-2"
-          >
-            <MousePointer2 className="h-3 w-3" />
-          </Button>
-          <Select onValueChange={addAttribute}>
-            <SelectTrigger className="w-[100px] h-6 text-xs">
-              <SelectValue placeholder="Add..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableAttributes
-                .filter(attr => !selectedAttributes.find(a => a.key === attr.key))
-                .map(attr => (
-                  <SelectItem key={attr.key} value={attr.key}>{attr.label}</SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Compact draggable attribute chips */}
-      <div className="flex flex-wrap gap-1 mb-1 flex-shrink-0">
-        {selectedAttributes.map((attr, index) => (
-          <div
-            key={attr.key}
-            draggable
-            onDragStart={() => handleDragStart(index)}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDrop={() => handleDrop(index)}
-            onDragEnd={handleDragEnd}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-grab active:cursor-grabbing transition-all ${
-              draggedIndex === index 
-                ? 'bg-primary/30 scale-105' 
-                : dragOverIndex === index 
-                  ? 'bg-primary/20 ring-1 ring-primary' 
-                  : 'bg-primary/10'
-            }`}
-          >
-            <span className="select-none">{attr.label.slice(0, 12)}</span>
-            {selectedAttributes.length > 2 && (
-              <X className="h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeAttribute(attr.key); }} />
+    <>
+      <Card className="glass-panel p-3 h-full flex flex-col">
+        <div className="flex items-center justify-between gap-1 mb-1 flex-shrink-0 flex-wrap">
+          <h3 className="text-sm font-semibold">Parallel Coords</h3>
+          <div className="flex items-center gap-1">
+            {effectiveSelection.size > 0 && (
+              <Button variant="outline" size="sm" onClick={handleClearSelection} className="h-6 text-xs px-2">
+                <X className="h-3 w-3 mr-1" />{effectiveSelection.size}
+              </Button>
             )}
+            <Button
+              variant={isMultiSelectMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
+              className="h-6 text-xs px-2"
+            >
+              <MousePointer2 className="h-3 w-3" />
+            </Button>
+            <Select onValueChange={addAttribute}>
+              <SelectTrigger className="w-[100px] h-6 text-xs">
+                <SelectValue placeholder="Add..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableAttributes
+                  .filter(attr => !selectedAttributes.find(a => a.key === attr.key))
+                  .map(attr => (
+                    <SelectItem key={attr.key} value={attr.key}>{attr.label}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(true)} className="h-6 w-6 p-0">
+              <Maximize2 className="h-3 w-3" />
+            </Button>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="flex-1 min-h-0 relative">
-        <svg
-          ref={svgRef}
-          width="100%"
-          height="100%"
-          className="overflow-visible"
-        >
-          <g transform={`translate(${margin.left}, ${margin.top})`}>
-            {/* Draw axes */}
-            {selectedAttributes.map((attr, i) => {
-              const x = i * axisSpacing;
-              
-              return (
-                <g key={attr.key}>
-                  {/* Axis line */}
-                  <line
-                    x1={x}
-                    y1={0}
-                    x2={x}
-                    y2={height}
-                    stroke="hsl(var(--border))"
-                    strokeWidth={2}
-                  />
-                  
-                  {/* Axis label */}
-                  <text
-                    x={x}
-                    y={-10}
-                    textAnchor="middle"
-                    fill="hsl(var(--foreground))"
-                    fontSize={12}
-                    fontWeight="600"
-                  >
-                    {attr.label}
-                  </text>
-                  
-                  {/* Min/Max labels */}
-                  <text
-                    x={x}
-                    y={height + 20}
-                    textAnchor="middle"
-                    fill="hsl(var(--muted-foreground))"
-                    fontSize={10}
-                  >
-                    Min
-                  </text>
-                  <text
-                    x={x}
-                    y={-25}
-                    textAnchor="middle"
-                    fill="hsl(var(--muted-foreground))"
-                    fontSize={10}
-                  >
-                    Max
-                  </text>
-                </g>
-              );
-            })}
+        {/* Compact draggable attribute chips */}
+        <div className="flex flex-wrap gap-1 mb-1 flex-shrink-0">
+          {selectedAttributes.map((attr, index) => (
+            <div
+              key={attr.key}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={() => handleDrop(index)}
+              onDragEnd={handleDragEnd}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-grab active:cursor-grabbing transition-all ${
+                draggedIndex === index 
+                  ? 'bg-primary/30 scale-105' 
+                  : dragOverIndex === index 
+                    ? 'bg-primary/20 ring-1 ring-primary' 
+                    : 'bg-primary/10'
+              }`}
+            >
+              <span className="select-none">{attr.label.slice(0, 12)}</span>
+              {selectedAttributes.length > 2 && (
+                <X className="h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeAttribute(attr.key); }} />
+              )}
+            </div>
+          ))}
+        </div>
 
-            {/* Draw lines for each country */}
-            {normalizedData.map(({ country, normalized }) => (
-              <path
-                key={country.countryCode}
-                d={generatePath(normalized)}
-                fill="none"
-                stroke={getLineColor(country.countryCode)}
-                strokeWidth={getLineWidth(country.countryCode)}
-                opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
-                onMouseEnter={() => setHoveredCountry(country.countryCode)}
-                onMouseLeave={() => setHoveredCountry(null)}
-                onClick={() => handleLineClick(country)}
-                style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-              >
-                <title>{country.country}</title>
-              </path>
-            ))}
-          </g>
-        </svg>
-      </div>
-
-    </Card>
+        {parallelContent()}
+      </Card>
+      
+      <FullscreenOverlay isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title="Interactive Parallel Coordinates">
+        {parallelContent(true)}
+      </FullscreenOverlay>
+    </>
   );
 };

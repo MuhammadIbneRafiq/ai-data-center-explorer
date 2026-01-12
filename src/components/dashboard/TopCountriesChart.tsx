@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceArea } from "recharts";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, Maximize2 } from "lucide-react";
+import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface TopCountriesChartProps {
   data: CountryData[];
@@ -32,6 +33,9 @@ export const TopCountriesChart = ({
   onBrushSelection,
 }: TopCountriesChartProps) => {
   const metricLabel = metricLabels[metric] ?? String(metric);
+  
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Brush selection state
   const [brushStart, setBrushStart] = useState<number | null>(null);
@@ -148,98 +152,98 @@ export const TopCountriesChart = ({
     return "hsl(var(--chart-1))"; // Default color
   };
 
-  return (
-    <Card className="glass-panel p-3 h-full flex flex-col">
-      <div className="flex items-center justify-between gap-2 mb-1 flex-shrink-0">
-        <h3 className="text-sm font-semibold truncate">Top by {metricLabel}</h3>
-        {hasSelection && (
-          <Button variant="outline" size="sm" onClick={handleClearSelection} className="gap-1 h-6 text-xs px-2">
-            <X className="h-3 w-3" />
-            {highlightedCountries.size}
-          </Button>
-        )}
-      </div>
+  const chartContent = (fullscreen = false) => (
+    <div 
+      ref={!fullscreen ? chartRef : undefined}
+      className={`relative cursor-crosshair select-none ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      {/* Brush selection overlay */}
+      {isBrushing && brushStart !== null && brushEnd !== null && (
+        <div
+          className="absolute left-0 right-0 bg-primary/20 border-y-2 border-primary pointer-events-none z-10"
+          style={{
+            top: `${Math.min(brushStart, brushEnd)}%`,
+            height: `${Math.abs(brushEnd - brushStart)}%`,
+          }}
+        />
+      )}
       
-      <div 
-        ref={chartRef}
-        className="flex-1 min-h-0 relative cursor-crosshair select-none"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        {/* Brush selection overlay */}
-        {isBrushing && brushStart !== null && brushEnd !== null && (
-          <div
-            className="absolute left-0 right-0 bg-primary/20 border-y-2 border-primary pointer-events-none z-10"
-            style={{
-              top: `${Math.min(brushStart, brushEnd)}%`,
-              height: `${Math.abs(brushEnd - brushStart)}%`,
-            }}
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={topCountries}
+          layout="vertical"
+          margin={{ left: 80, right: 20 }}
+        >
+          <XAxis
+            type="number"
+            dataKey="value"
+            domain={[0, "dataMax"]}
+            stroke="hsl(var(--muted-foreground))"
           />
-        )}
-        
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={topCountries}
-            layout="vertical"
-            margin={{ left: 80, right: 20 }}
+          <YAxis
+            type="category"
+            dataKey="name"
+            stroke="hsl(var(--muted-foreground))"
+            width={80}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              color: "hsl(var(--foreground))",
+            }}
+            labelStyle={{ color: "hsl(var(--foreground))" }}
+            itemStyle={{ color: "hsl(var(--foreground))" }}
+            formatter={(value: number) => [value.toFixed(2), metricLabel]}
+          />
+          <Bar
+            dataKey="value"
+            radius={[0, 0, 0, 0]}
+            onClick={(_, index) => {
+              const item = topCountries[index];
+              if (item && onCountrySelect) onCountrySelect(item.country);
+            }}
           >
-            <XAxis
-              type="number"
-              dataKey="value"
-              domain={[0, "dataMax"]}
-              stroke="hsl(var(--muted-foreground))"
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              stroke="hsl(var(--muted-foreground))"
-              width={80}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px",
-                color: "hsl(var(--foreground))", // fallback
-              }}
-              labelStyle={{
-                color: "hsl(var(--foreground))",
-              }}
-              itemStyle={{
-                color: "hsl(var(--foreground))",
-              }}
-              formatter={(value: number) => [
-                value.toFixed(2),
-                metricLabel,
-              ]}
-            />
+            {topCountries.map((item, index) => (
+              <Cell
+                key={item.country.countryCode ?? item.country.country}
+                fill={getBarColor(item.country.countryCode, index)}
+                style={{ cursor: "pointer", transition: "fill 0.2s ease-in-out" }}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
 
-            <Bar
-              dataKey="value"
-              radius={[0, 0, 0, 0]}
-              onClick={(_, index) => {
-                const item = topCountries[index];
-                if (item && onCountrySelect) {
-                  onCountrySelect(item.country);
-                }
-              }}
-            >
-              {topCountries.map((item, index) => (
-                <Cell
-                  key={item.country.countryCode ?? item.country.country}
-                  fill={getBarColor(item.country.countryCode, index)}
-                  style={{ 
-                    cursor: "pointer",
-                    transition: "fill 0.2s ease-in-out",
-                  }}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </Card>
+  return (
+    <>
+      <Card className="glass-panel p-3 h-full flex flex-col">
+        <div className="flex items-center justify-between gap-2 mb-1 flex-shrink-0">
+          <h3 className="text-sm font-semibold truncate">Top by {metricLabel}</h3>
+          <div className="flex items-center gap-1">
+            {hasSelection && (
+              <Button variant="outline" size="sm" onClick={handleClearSelection} className="h-6 text-xs px-2">
+                <X className="h-3 w-3 mr-1" />{highlightedCountries.size}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(true)} className="h-6 w-6 p-0">
+              <Maximize2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+        {chartContent()}
+      </Card>
+      
+      <FullscreenOverlay isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title={`Top Countries by ${metricLabel}`}>
+        {chartContent(true)}
+      </FullscreenOverlay>
+    </>
   );
 };
