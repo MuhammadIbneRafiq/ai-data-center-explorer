@@ -149,30 +149,20 @@ export const TopCountriesChart = ({
   };
 
   return (
-    <Card className="glass-panel p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold">Top Countries by {metricLabel}</h3>
-          <p className="text-sm text-muted-foreground">
-            Drag vertically to select bars and highlight across all charts
-          </p>
-        </div>
+    <Card className="glass-panel p-3 h-full flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-1 flex-shrink-0">
+        <h3 className="text-sm font-semibold truncate">Top by {metricLabel}</h3>
         {hasSelection && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClearSelection}
-            className="gap-1"
-          >
-            <X className="h-4 w-4" />
-            Clear Selection ({highlightedCountries.size})
+          <Button variant="outline" size="sm" onClick={handleClearSelection} className="gap-1 h-6 text-xs px-2">
+            <X className="h-3 w-3" />
+            {highlightedCountries.size}
           </Button>
         )}
       </div>
       
       <div 
         ref={chartRef}
-        className="h-80 relative cursor-crosshair select-none"
+        className="flex-1 min-h-0 relative cursor-crosshair select-none"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

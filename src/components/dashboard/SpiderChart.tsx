@@ -222,70 +222,59 @@ export const SpiderChart = ({
   };
 
   return (
-    <Card className="glass-panel p-6 space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-bold">Country Profile Comparison</h3>
-          <p className="text-sm text-muted-foreground">
-            Multi-dimensional comparison across Accessibility, Profitability & Efficiency.
-            {selectedCountry ? ` Showing: ${selectedCountry.country}` : " Select a country to compare."}
-            {" "}Click polygons to add/remove countries from comparison.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onClearComparison && onClearComparison()}
-          disabled={!compareCountries || compareCountries.length === 0}
-        >
-          Clear comparison
-        </Button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {compareCountries.map((country) => (
-          <div
-            key={country.countryCode}
-            className="flex items-center gap-2 rounded-full border border-border bg-muted/20 px-3 py-1 text-xs text-foreground"
+    <Card className="glass-panel p-3 h-full flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-1 flex-shrink-0">
+        <h3 className="text-sm font-semibold truncate">Radar Comparison</h3>
+        <div className="flex items-center gap-1">
+          <Select
+            value={isSelectOpen ? pendingSelectValue : undefined}
+            onValueChange={handleDropdownValueChange}
+            onOpenChange={(open) => {
+              setIsSelectOpen(open);
+              if (!open) setPendingSelectValue(undefined);
+            }}
           >
-            <span>{country.country}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 p-0 text-muted-foreground"
-              onClick={() => removeComparisonCountry(country.countryCode)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ))}
-        <Select
-          value={isSelectOpen ? pendingSelectValue : undefined}
-          onValueChange={handleDropdownValueChange}
-          onOpenChange={(open) => {
-            setIsSelectOpen(open);
-            if (!open) {
-              setPendingSelectValue(undefined);
-            }
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Add country..." />
-          </SelectTrigger>
-          <SelectContent>
-            {sortedCountries
-              .filter((country) => !compareCountries.some((c) => c.countryCode === country.countryCode))
-              .map((country) => (
-                <SelectItem key={country.countryCode} value={country.countryCode}>
-                  {country.country}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger className="w-[120px] h-6 text-xs">
+              <SelectValue placeholder="Add..." />
+            </SelectTrigger>
+            <SelectContent>
+              {sortedCountries
+                .filter((country) => !compareCountries.some((c) => c.countryCode === country.countryCode))
+                .map((country) => (
+                  <SelectItem key={country.countryCode} value={country.countryCode}>
+                    {country.country}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onClearComparison && onClearComparison()}
+            disabled={!compareCountries || compareCountries.length === 0}
+            className="h-6 text-xs px-2"
+          >
+            Clear
+          </Button>
+        </div>
       </div>
+      
+      {/* Compact chips */}
+      {compareCountries.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 mb-1 flex-shrink-0">
+          {compareCountries.slice(0, 5).map((country) => (
+            <div key={country.countryCode} className="flex items-center gap-1 rounded-full border bg-muted/20 px-2 py-0.5 text-xs">
+              <span>{country.country.slice(0, 10)}</span>
+              <X className="h-3 w-3 cursor-pointer" onClick={() => removeComparisonCountry(country.countryCode)} />
+            </div>
+          ))}
+          {compareCountries.length > 5 && <span className="text-xs text-muted-foreground">+{compareCountries.length - 5}</span>}
+        </div>
+      )}
 
-      <div className="h-80">
+      <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+          <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
             <PolarGrid stroke="hsl(var(--border))" />
             <PolarAngleAxis 
               dataKey="attribute" 
@@ -324,19 +313,9 @@ export const SpiderChart = ({
                 props.payload?.fullLabel || name
               ]}
             />
-            <Legend />
+          <Legend wrapperStyle={{ fontSize: 10 }} />
           </RadarChart>
         </ResponsiveContainer>
-      </div>
-
-      <div className="text-xs text-muted-foreground space-y-1">
-        <p><strong>Metrics:</strong> Road Density, Airports, Internet Users, GDP, Employment (inverted), Electricity Access, CO₂ Efficiency (inverted), Literacy Rate</p>
-        <p><strong>Note:</strong> Higher values are better. Unemployment and CO₂/GDP are inverted so higher = better performance.</p>
-        {countriesWithMissingLiteracy.length > 0 && (
-          <p className="text-amber-500">
-            <strong>⚠ Missing data:</strong> Literacy rate unavailable for {countriesWithMissingLiteracy.join(", ")}; vertex omitted on that axis.
-          </p>
-        )}
       </div>
     </Card>
   );
