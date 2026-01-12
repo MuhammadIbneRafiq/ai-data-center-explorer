@@ -227,7 +227,7 @@ const Index = () => {
                   minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, topRow: [size, 100 - size] }))}
                 >
-                  <div className="h-full p-1.5 overflow-hidden">
+                  <div className="h-full p-1 overflow-auto">
                     <TopCountriesChart
                       data={filteredData}
                       metric={filters.selectedMetric as keyof CountryData}
@@ -244,7 +244,7 @@ const Index = () => {
                   minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, topRow: [100 - size, size] }))}
                 >
-                  <div className="h-full p-1.5 overflow-hidden">
+                  <div className="h-full p-1 overflow-auto">
                     <SpiderChart
                       data={filteredData}
                       selectedCountry={selectedCountry}
@@ -268,7 +268,7 @@ const Index = () => {
                   minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, bottomRow: [size, 100 - size] }))}
                 >
-                  <div className="h-full p-1.5 overflow-hidden">
+                  <div className="h-full p-1 overflow-auto">
                     <ScatterPlotMatrix
                       data={filteredData}
                       activeCountry={selectedCountry}
@@ -284,7 +284,7 @@ const Index = () => {
                   minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, bottomRow: [100 - size, size] }))}
                 >
-                  <div className="h-full p-1.5 overflow-hidden">
+                  <div className="h-full p-1 overflow-auto">
                     <InteractiveParallelCoordinates
                       data={filteredData}
                       selectedCountries={selectedCountry ? [selectedCountry] : []}

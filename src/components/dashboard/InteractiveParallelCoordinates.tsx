@@ -82,13 +82,18 @@ export const InteractiveParallelCoordinates = ({
     const updateDimensions = () => {
       if (svgRef.current) {
         const rect = svgRef.current.getBoundingClientRect();
-        setDimensions({ width: rect.width, height: 400 });
+        setDimensions({ width: rect.width, height: rect.height || 300 });
       }
     };
     
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    // Also update on initial render after a short delay to get correct dimensions
+    const timeout = setTimeout(updateDimensions, 100);
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+      clearTimeout(timeout);
+    };
   }, []);
 
   const addAttribute = (attrKey: string) => {
@@ -238,74 +243,40 @@ export const InteractiveParallelCoordinates = ({
   };
 
   return (
-    <Card className="glass-panel p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h3 className="text-lg font-bold">Interactive Parallel Coordinates</h3>
-          <p className="text-sm text-muted-foreground">
-            Click lines to select multiple countries. Shift+click for single select.
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2">
+    <Card className="glass-panel p-3 h-full flex flex-col">
+      <div className="flex items-center justify-between gap-1 mb-1 flex-shrink-0 flex-wrap">
+        <h3 className="text-sm font-semibold">Parallel Coords</h3>
+        <div className="flex items-center gap-1">
           {effectiveSelection.size > 0 && (
-            <Button variant="outline" size="sm" onClick={handleClearSelection} className="gap-1">
-              <X className="h-4 w-4" />
-              Clear ({effectiveSelection.size})
+            <Button variant="outline" size="sm" onClick={handleClearSelection} className="h-6 text-xs px-2">
+              <X className="h-3 w-3 mr-1" />{effectiveSelection.size}
             </Button>
           )}
           <Button
             variant={isMultiSelectMode ? "default" : "outline"}
             size="sm"
             onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
-            className="gap-1"
+            className="h-6 text-xs px-2"
           >
-            <MousePointer2 className="h-4 w-4" />
-            Multi-Select
+            <MousePointer2 className="h-3 w-3" />
           </Button>
           <Select onValueChange={addAttribute}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Add attribute..." />
+            <SelectTrigger className="w-[100px] h-6 text-xs">
+              <SelectValue placeholder="Add..." />
             </SelectTrigger>
             <SelectContent>
               {availableAttributes
                 .filter(attr => !selectedAttributes.find(a => a.key === attr.key))
                 .map(attr => (
-                  <SelectItem key={attr.key} value={attr.key}>
-                    {attr.label}
-                  </SelectItem>
+                  <SelectItem key={attr.key} value={attr.key}>{attr.label}</SelectItem>
                 ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Selected countries badges */}
-      {effectiveSelection.size > 0 && (
-        <div className="flex flex-wrap gap-1 p-2 bg-muted/30 rounded-lg">
-          {Array.from(effectiveSelection).slice(0, 8).map(code => {
-            const country = data.find(c => c.countryCode === code);
-            return (
-              <Badge
-                key={code}
-                variant="secondary"
-                className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground text-xs"
-                onClick={() => handleLineClick(country!)}
-              >
-                {country?.country?.slice(0, 15) || code}
-                <X className="h-3 w-3 ml-1" />
-              </Badge>
-            );
-          })}
-          {effectiveSelection.size > 8 && (
-            <Badge variant="outline" className="text-xs">+{effectiveSelection.size - 8} more</Badge>
-          )}
-        </div>
-      )}
-
-      {/* Selected attributes chips - draggable */}
-      <div className="flex flex-wrap gap-2">
-        <p className="text-xs text-muted-foreground w-full mb-1">Drag to reorder axes:</p>
+      {/* Compact draggable attribute chips */}
+      <div className="flex flex-wrap gap-1 mb-1 flex-shrink-0">
         {selectedAttributes.map((attr, index) => (
           <div
             key={attr.key}
@@ -314,37 +285,27 @@ export const InteractiveParallelCoordinates = ({
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={() => handleDrop(index)}
             onDragEnd={handleDragEnd}
-            className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm cursor-grab active:cursor-grabbing transition-all ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-grab active:cursor-grabbing transition-all ${
               draggedIndex === index 
-                ? 'bg-primary/30 scale-105 shadow-lg' 
+                ? 'bg-primary/30 scale-105' 
                 : dragOverIndex === index 
-                  ? 'bg-primary/20 ring-2 ring-primary' 
-                  : 'bg-primary/10 hover:bg-primary/15'
+                  ? 'bg-primary/20 ring-1 ring-primary' 
+                  : 'bg-primary/10'
             }`}
           >
-            <span className="select-none">{attr.label}</span>
+            <span className="select-none">{attr.label.slice(0, 12)}</span>
             {selectedAttributes.length > 2 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-4 w-4 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeAttribute(attr.key);
-                }}
-              >
-                <X className="h-3 w-3" />
-              </Button>
+              <X className="h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeAttribute(attr.key); }} />
             )}
           </div>
         ))}
       </div>
 
-      <div className="relative" style={{ height: dimensions.height }}>
+      <div className="flex-1 min-h-0 relative">
         <svg
           ref={svgRef}
           width="100%"
-          height={dimensions.height}
+          height="100%"
           className="overflow-visible"
         >
           <g transform={`translate(${margin.left}, ${margin.top})`}>
@@ -420,13 +381,6 @@ export const InteractiveParallelCoordinates = ({
         </svg>
       </div>
 
-      {hoveredCountry && (
-        <div className="text-sm text-center text-muted-foreground">
-          Hovering: <span className="font-semibold text-foreground">
-            {normalizedData.find(d => d.country.countryCode === hoveredCountry)?.country.country}
-          </span>
-        </div>
-      )}
     </Card>
   );
 };

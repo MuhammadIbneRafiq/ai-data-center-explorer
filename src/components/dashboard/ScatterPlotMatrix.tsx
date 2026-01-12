@@ -164,10 +164,9 @@ export const ScatterPlotMatrix = ({
     onBrushSelection(selectedCodes);
   }, [data, highlightedCountries, onBrushSelection]);
 
-  // Generate matrix cells
+  // Generate matrix cells - use 100% height since parent is flex
   const renderMatrix = () => {
     const cells: JSX.Element[] = [];
-    const cellHeight = matrixSize === "1x1" ? 350 : matrixSize === "2x2" ? 200 : 160;
 
     for (let row = 0; row < gridSize; row++) {
       for (let col = 0; col < gridSize; col++) {
@@ -180,10 +179,9 @@ export const ScatterPlotMatrix = ({
           cells.push(
             <div
               key={cellKey}
-              className="flex items-center justify-center bg-muted/30 rounded-lg border border-border/50"
-              style={{ height: cellHeight }}
+              className="flex items-center justify-center bg-muted/30 rounded border border-border/50 h-full"
             >
-              <span className="text-sm font-medium text-center px-2">{getLabel(xAttr)}</span>
+              <span className="text-xs font-medium text-center px-1">{getLabel(xAttr)}</span>
             </div>
           );
         } else {
@@ -193,8 +191,7 @@ export const ScatterPlotMatrix = ({
           cells.push(
             <div
               key={cellKey}
-              className="relative"
-              style={{ height: cellHeight }}
+              className="relative h-full"
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart 
@@ -316,92 +313,55 @@ export const ScatterPlotMatrix = ({
   };
 
   return (
-    <Card className="glass-panel p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h3 className="text-lg font-bold">Scatter Plot Matrix (SPLOM)</h3>
-          <p className="text-sm text-muted-foreground">
-            {brushMode 
-              ? "Drag to select countries in a region. Click points to toggle." 
-              : "Click points to select. Enable brush mode to drag-select."
-            }
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <Card className="glass-panel p-3 h-full flex flex-col">
+      <div className="flex items-center justify-between gap-1 mb-1 flex-shrink-0 flex-wrap">
+        <h3 className="text-sm font-semibold">SPLOM</h3>
+        <div className="flex items-center gap-1">
           {hasSelection && (
-            <Button variant="outline" size="sm" onClick={handleClearSelection} className="gap-1">
-              <X className="h-4 w-4" />
-              Clear ({highlightedCountries?.size})
+            <Button variant="outline" size="sm" onClick={handleClearSelection} className="h-6 text-xs px-2">
+              <X className="h-3 w-3 mr-1" />{highlightedCountries?.size}
             </Button>
           )}
           <Button
             variant={brushMode ? "default" : "outline"}
             size="sm"
             onClick={() => setBrushMode(!brushMode)}
-            className="gap-1"
-            title="Toggle brush selection mode"
+            className="h-6 text-xs px-2"
           >
-            <MousePointer2 className="h-4 w-4" />
-            {brushMode ? "Brush On" : "Brush"}
+            <MousePointer2 className="h-3 w-3" />
           </Button>
-          <div className="flex items-center border rounded-lg overflow-hidden">
-            <Button
-              variant={matrixSize === "1x1" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setMatrixSize("1x1")}
-              className="rounded-none px-3"
-            >
-              <Square className="h-4 w-4" />
+          <div className="flex items-center border rounded overflow-hidden">
+            <Button variant={matrixSize === "1x1" ? "default" : "ghost"} size="sm" onClick={() => setMatrixSize("1x1")} className="rounded-none px-2 h-6">
+              <Square className="h-3 w-3" />
             </Button>
-            <Button
-              variant={matrixSize === "2x2" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setMatrixSize("2x2")}
-              className="rounded-none px-3"
-            >
-              <Grid2X2 className="h-4 w-4" />
+            <Button variant={matrixSize === "2x2" ? "default" : "ghost"} size="sm" onClick={() => setMatrixSize("2x2")} className="rounded-none px-2 h-6">
+              <Grid2X2 className="h-3 w-3" />
             </Button>
-            <Button
-              variant={matrixSize === "3x3" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setMatrixSize("3x3")}
-              className="rounded-none px-3"
-            >
-              <Grid3X3 className="h-4 w-4" />
+            <Button variant={matrixSize === "3x3" ? "default" : "ghost"} size="sm" onClick={() => setMatrixSize("3x3")} className="rounded-none px-2 h-6">
+              <Grid3X3 className="h-3 w-3" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Attribute selectors */}
-      <div className="flex flex-wrap gap-2">
+      {/* Compact attribute selectors */}
+      <div className="flex flex-wrap gap-1 mb-1 flex-shrink-0">
         {activeAttributes.map((attr, index) => (
-          <Select
-            key={index}
-            value={attr}
-            onValueChange={(value) => handleAttributeChange(index, value as keyof CountryData)}
-          >
-            <SelectTrigger className="w-[140px] h-8 text-xs">
+          <Select key={index} value={attr} onValueChange={(value) => handleAttributeChange(index, value as keyof CountryData)}>
+            <SelectTrigger className="w-[100px] h-6 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {attributeOptions.map(opt => (
-                <SelectItem key={opt.key} value={opt.key}>
-                  {opt.label}
-                </SelectItem>
+                <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         ))}
       </div>
 
-      {/* Matrix grid */}
-      <div
-        className="grid gap-2"
-        style={{
-          gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-        }}
-      >
+      {/* Matrix grid - flex to fill remaining space */}
+      <div className="flex-1 min-h-0 grid gap-1" style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}>
         {renderMatrix()}
       </div>
     </Card>
