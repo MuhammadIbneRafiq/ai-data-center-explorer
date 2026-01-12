@@ -176,61 +176,58 @@ const Index = () => {
         highlightedCountries={highlightedCountries}
         onHighlightedCountriesChange={setHighlightedCountries}
       />
-      <div className="min-h-screen bg-background p-4 pb-10 pr-14 space-y-6">
-        {/* Header */}
-        <header className="flex items-center justify-between">
+      <div className="h-screen flex flex-col bg-background p-3 pr-14 overflow-hidden">
+        {/* Compact Header */}
+        <header className="flex items-center justify-between flex-shrink-0 mb-2">
           <div className="flex-1">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-chart-2 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-chart-2 bg-clip-text text-transparent">
               AI Datacenter Location Dashboard
             </h1>
-            <p className="text-muted-foreground mt-2">
-              Group 13 Visualization group present
-            </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={resetLayout}
-              className="gap-2"
+              className="gap-1 h-8 text-xs"
             >
-              <RotateCcw className="h-4 w-4" />
-              Reset Layout
+              <RotateCcw className="h-3 w-3" />
+              Reset
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={loadCountryData}
-              className="gap-2"
+              className="gap-1 h-8 text-xs"
             >
-              <Upload className="h-4 w-4" />
-              Refresh Data
+              <Upload className="h-3 w-3" />
+              Refresh
             </Button>
             <ThemeToggle />
           </div>
         </header>
         
-        {/* Layout hint */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-          <Move className="h-4 w-4" />
-          <span>Drag panel edges to resize • Select countries in charts to highlight across all visualizations</span>
+        {/* Layout hint - compact */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1 flex-shrink-0 mb-2">
+          <Move className="h-3 w-3" />
+          <span>Drag edges to resize • Click charts to select countries</span>
         </div>
 
-        {/* Resizable Panel Grid */}
-        <div className="flex-1 min-h-[800px]">
+        {/* Resizable Panel Grid - fills remaining viewport */}
+        <div className="flex-1 min-h-0">
           <ResizablePanelGroup
             direction="vertical"
-            className="min-h-[800px] rounded-lg border"
+            className="h-full rounded-lg border"
           >
             {/* Top Row */}
-            <ResizablePanel defaultSize={50} minSize={25}>
-              <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={50} minSize={20}>
+              <ResizablePanelGroup direction="horizontal" className="h-full">
                 <ResizablePanel 
                   defaultSize={panelSizes.topRow[0]} 
-                  minSize={20}
+                  minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, topRow: [size, 100 - size] }))}
                 >
-                  <div className="h-full p-2">
+                  <div className="h-full p-1.5 overflow-hidden">
                     <TopCountriesChart
                       data={filteredData}
                       metric={filters.selectedMetric as keyof CountryData}
@@ -244,10 +241,10 @@ const Index = () => {
                 <ResizableHandle withHandle />
                 <ResizablePanel 
                   defaultSize={panelSizes.topRow[1]} 
-                  minSize={20}
+                  minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, topRow: [100 - size, size] }))}
                 >
-                  <div className="h-full p-2">
+                  <div className="h-full p-1.5 overflow-hidden">
                     <SpiderChart
                       data={filteredData}
                       selectedCountry={selectedCountry}
@@ -264,14 +261,14 @@ const Index = () => {
             <ResizableHandle withHandle />
             
             {/* Bottom Row */}
-            <ResizablePanel defaultSize={50} minSize={25}>
-              <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={50} minSize={20}>
+              <ResizablePanelGroup direction="horizontal" className="h-full">
                 <ResizablePanel 
                   defaultSize={panelSizes.bottomRow[0]} 
-                  minSize={20}
+                  minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, bottomRow: [size, 100 - size] }))}
                 >
-                  <div className="h-full p-2">
+                  <div className="h-full p-1.5 overflow-hidden">
                     <ScatterPlotMatrix
                       data={filteredData}
                       activeCountry={selectedCountry}
@@ -284,10 +281,10 @@ const Index = () => {
                 <ResizableHandle withHandle />
                 <ResizablePanel 
                   defaultSize={panelSizes.bottomRow[1]} 
-                  minSize={20}
+                  minSize={15}
                   onResize={(size) => setPanelSizes(prev => ({ ...prev, bottomRow: [100 - size, size] }))}
                 >
-                  <div className="h-full p-2">
+                  <div className="h-full p-1.5 overflow-hidden">
                     <InteractiveParallelCoordinates
                       data={filteredData}
                       selectedCountries={selectedCountry ? [selectedCountry] : []}
