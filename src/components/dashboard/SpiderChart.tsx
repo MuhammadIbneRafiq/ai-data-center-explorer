@@ -9,8 +9,9 @@ import {
 } from "@/components/ui/select";
 import { CountryData } from "@/types/country-data";
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import { X } from "lucide-react";
+import { X, Maximize2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface SpiderChartProps {
   data: CountryData[];
@@ -60,6 +61,8 @@ export const SpiderChart = ({
   onClearComparison,
   onCompareCountriesChange,
 }: SpiderChartProps) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
   // Calculate normalized values for radar chart
   // Track countries with missing literacy data for caption
   const countriesWithMissingLiteracy = useMemo(() => {
@@ -221,102 +224,115 @@ export const SpiderChart = ({
     onCompareCountriesChange?.(nextCountries);
   };
 
-  return (
-    <Card className="glass-panel p-3 h-full flex flex-col">
-      <div className="flex items-center justify-between gap-2 mb-1 flex-shrink-0">
-        <h3 className="text-sm font-semibold truncate">Radar Comparison</h3>
-        <div className="flex items-center gap-1">
-          <Select
-            value={isSelectOpen ? pendingSelectValue : undefined}
-            onValueChange={handleDropdownValueChange}
-            onOpenChange={(open) => {
-              setIsSelectOpen(open);
-              if (!open) setPendingSelectValue(undefined);
-            }}
-          >
-            <SelectTrigger className="w-[120px] h-6 text-xs">
-              <SelectValue placeholder="Add..." />
-            </SelectTrigger>
-            <SelectContent>
-              {sortedCountries
-                .filter((country) => !compareCountries.some((c) => c.countryCode === country.countryCode))
-                .map((country) => (
-                  <SelectItem key={country.countryCode} value={country.countryCode}>
-                    {country.country}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onClearComparison && onClearComparison()}
-            disabled={!compareCountries || compareCountries.length === 0}
-            className="h-6 text-xs px-2"
-          >
-            Clear
-          </Button>
-        </div>
-      </div>
-      
-      {/* Compact chips */}
-      {compareCountries.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 mb-1 flex-shrink-0">
-          {compareCountries.slice(0, 5).map((country) => (
-            <div key={country.countryCode} className="flex items-center gap-1 rounded-full border bg-muted/20 px-2 py-0.5 text-xs">
-              <span>{country.country.slice(0, 10)}</span>
-              <X className="h-3 w-3 cursor-pointer" onClick={() => removeComparisonCountry(country.countryCode)} />
-            </div>
+  const radarContent = (fullscreen = false) => (
+    <div className={fullscreen ? "h-full" : "flex-1 min-h-0"}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+          <PolarGrid stroke="hsl(var(--border))" />
+          <PolarAngleAxis 
+            dataKey="attribute" 
+            stroke="hsl(var(--muted-foreground))"
+            tick={{ fill: "hsl(var(--foreground))", fontSize: fullscreen ? 14 : 11 }}
+          />
+          <PolarRadiusAxis 
+            angle={30} 
+            domain={[0, 100]}
+            stroke="hsl(var(--muted-foreground))"
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: fullscreen ? 12 : 10 }}
+          />
+          
+          {displayCountries.map((country, index) => (
+            <Radar
+              key={country.countryCode}
+              name={country.country}
+              dataKey={country.country}
+              stroke={colors[index % colors.length]}
+              fill={colors[index % colors.length]}
+              fillOpacity={0.2}
+              strokeWidth={2}
+              onClick={() => onCountrySelect && onCountrySelect(country)}
+              style={{ cursor: 'pointer' }}
+            />
           ))}
-          {compareCountries.length > 5 && <span className="text-xs text-muted-foreground">+{compareCountries.length - 5}</span>}
-        </div>
-      )}
+          
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+            }}
+            formatter={(value: number, name: string, props: any) => [
+              `${value}%`,
+              props.payload?.fullLabel || name
+            ]}
+          />
+          <Legend wrapperStyle={{ fontSize: fullscreen ? 12 : 10 }} />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
 
-      <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
-            <PolarGrid stroke="hsl(var(--border))" />
-            <PolarAngleAxis 
-              dataKey="attribute" 
-              stroke="hsl(var(--muted-foreground))"
-              tick={{ fill: "hsl(var(--foreground))", fontSize: 11 }}
-            />
-            <PolarRadiusAxis 
-              angle={30} 
-              domain={[0, 100]}
-              stroke="hsl(var(--muted-foreground))"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-            />
-            
-            {displayCountries.map((country, index) => (
-              <Radar
-                key={country.countryCode}
-                name={country.country}
-                dataKey={country.country}
-                stroke={colors[index % colors.length]}
-                fill={colors[index % colors.length]}
-                fillOpacity={0.2}
-                strokeWidth={2}
-                onClick={() => onCountrySelect && onCountrySelect(country)}
-                style={{ cursor: 'pointer' }}
-              />
-            ))}
-            
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px",
+  return (
+    <>
+      <Card className="glass-panel p-3 h-full flex flex-col">
+        <div className="flex items-center justify-between gap-2 mb-1 flex-shrink-0">
+          <h3 className="text-sm font-semibold truncate">Radar Comparison</h3>
+          <div className="flex items-center gap-1">
+            <Select
+              value={isSelectOpen ? pendingSelectValue : undefined}
+              onValueChange={handleDropdownValueChange}
+              onOpenChange={(open) => {
+                setIsSelectOpen(open);
+                if (!open) setPendingSelectValue(undefined);
               }}
-              formatter={(value: number, name: string, props: any) => [
-                `${value}%`,
-                props.payload?.fullLabel || name
-              ]}
-            />
-          <Legend wrapperStyle={{ fontSize: 10 }} />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
-    </Card>
+            >
+              <SelectTrigger className="w-[120px] h-6 text-xs">
+                <SelectValue placeholder="Add..." />
+              </SelectTrigger>
+              <SelectContent>
+                {sortedCountries
+                  .filter((country) => !compareCountries.some((c) => c.countryCode === country.countryCode))
+                  .map((country) => (
+                    <SelectItem key={country.countryCode} value={country.countryCode}>
+                      {country.country}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onClearComparison && onClearComparison()}
+              disabled={!compareCountries || compareCountries.length === 0}
+              className="h-6 text-xs px-2"
+            >
+              Clear
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(true)} className="h-6 w-6 p-0">
+              <Maximize2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+        
+        {/* Compact chips */}
+        {compareCountries.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mb-1 flex-shrink-0">
+            {compareCountries.slice(0, 5).map((country) => (
+              <div key={country.countryCode} className="flex items-center gap-1 rounded-full border bg-muted/20 px-2 py-0.5 text-xs">
+                <span>{country.country.slice(0, 10)}</span>
+                <X className="h-3 w-3 cursor-pointer" onClick={() => removeComparisonCountry(country.countryCode)} />
+              </div>
+            ))}
+            {compareCountries.length > 5 && <span className="text-xs text-muted-foreground">+{compareCountries.length - 5}</span>}
+          </div>
+        )}
+
+        {radarContent()}
+      </Card>
+      
+      <FullscreenOverlay isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title="Country Profile Comparison">
+        {radarContent(true)}
+      </FullscreenOverlay>
+    </>
   );
 };
