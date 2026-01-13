@@ -44,7 +44,7 @@ export const ScatterPlotMatrix = ({
   highlightedCountries,
   onBrushSelection,
 }: ScatterPlotMatrixProps) => {
-  const [matrixSize, setMatrixSize] = useState<MatrixSize>("1x1");
+  const [matrixSize, setMatrixSize] = useState<MatrixSize>("2x2");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedAttributes, setSelectedAttributes] = useState<(keyof CountryData)[]>([
     "Real_GDP_per_Capita_USD",

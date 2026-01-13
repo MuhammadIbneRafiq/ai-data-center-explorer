@@ -43,12 +43,14 @@ const Index = () => {
     topRow: [50, 50],
     bottomRow: [50, 50],
   });
+  const [rowSizes, setRowSizes] = useState([45, 55]); // top row 45%, bottom row 55%
 
   const resetLayout = useCallback(() => {
     setPanelSizes({
       topRow: [50, 50],
       bottomRow: [50, 50],
     });
+    setRowSizes([45, 55]);
     toast({
       title: "Layout Reset",
       description: "Panel sizes have been reset to default.",
@@ -220,7 +222,7 @@ const Index = () => {
             className="h-full rounded-lg border"
           >
             {/* Top Row */}
-            <ResizablePanel defaultSize={50} minSize={20}>
+            <ResizablePanel defaultSize={45} minSize={20}>
               <ResizablePanelGroup direction="horizontal" className="h-full">
                 <ResizablePanel 
                   defaultSize={panelSizes.topRow[0]} 
@@ -261,7 +263,7 @@ const Index = () => {
             <ResizableHandle withHandle />
             
             {/* Bottom Row */}
-            <ResizablePanel defaultSize={50} minSize={20}>
+            <ResizablePanel defaultSize={55} minSize={20}>
               <ResizablePanelGroup direction="horizontal" className="h-full">
                 <ResizablePanel 
                   defaultSize={panelSizes.bottomRow[0]} 
