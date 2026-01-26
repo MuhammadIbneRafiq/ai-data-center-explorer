@@ -17,21 +17,18 @@ const Slider = React.forwardRef<
       value={value}
       {...props}
     >
-      <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-secondary">
+      <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-secondary/50">
         <SliderPrimitive.Range className="absolute h-full bg-primary" />
       </SliderPrimitive.Track>
       {/* Render a thumb for each value in the array */}
       {Array.from({ length: thumbCount }).map((_, index) => (
         <SliderPrimitive.Thumb 
           key={index}
-          className="block h-6 w-6 rounded-full border-2 border-primary bg-background ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:scale-110 hover:border-primary/80 cursor-ew-resize shadow-md"
+          className="block h-4 w-4 rounded-md border border-primary/50 bg-primary shadow-md transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 hover:scale-105 hover:bg-primary/90 hover:border-primary hover:shadow-lg cursor-ew-resize active:scale-95"
         >
-          {/* Arrow indicators */}
+          {/* Modern button indicator */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex gap-0.5">
-              <span className="text-[8px] text-primary font-bold">◀</span>
-              <span className="text-[8px] text-primary font-bold">▶</span>
-            </div>
+            <div className="w-1.5 h-1.5 bg-background rounded-sm" />
           </div>
         </SliderPrimitive.Thumb>
       ))}

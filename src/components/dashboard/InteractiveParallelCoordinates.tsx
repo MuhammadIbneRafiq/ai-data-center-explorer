@@ -243,14 +243,28 @@ export const InteractiveParallelCoordinates = ({
     return `M ${points.join(' L ')}`;
   };
 
-  const parallelContent = (fullscreen = false) => (
-    <div className={`relative ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
-      <svg
-        ref={!fullscreen ? svgRef : undefined}
-        width="100%"
-        height="100%"
-        className="overflow-visible"
-      >
+  const parallelContent = (fullscreen = false) => {
+    // Calculate dimensions based on whether we're in fullscreen
+    const contentDimensions = fullscreen 
+      ? { width: window.innerWidth * 0.9, height: window.innerHeight * 0.8 }
+      : dimensions;
+
+    // Recalculate layout dimensions for this content
+    const margin = { top: 60, right: 40, bottom: 40, left: 40 };
+    const width = contentDimensions.width - margin.left - margin.right;
+    const height = contentDimensions.height - margin.top - margin.bottom;
+    const axisSpacing = width / (selectedAttributes.length - 1 || 1);
+
+    return (
+      <div className={`relative ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
+        <svg
+          ref={!fullscreen ? svgRef : undefined}
+          width={contentDimensions.width}
+          height={contentDimensions.height}
+          className="overflow-visible"
+          viewBox={`0 0 ${contentDimensions.width} ${contentDimensions.height}`}
+          preserveAspectRatio="xMidYMid meet"
+        >
         <g transform={`translate(${margin.left}, ${margin.top})`}>
           {/* Draw axes */}
           {selectedAttributes.map((attr, i) => {
@@ -323,7 +337,8 @@ export const InteractiveParallelCoordinates = ({
         </g>
       </svg>
     </div>
-  );
+    );
+  };
 
   return (
     <>

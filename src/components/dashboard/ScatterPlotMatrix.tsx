@@ -4,7 +4,7 @@ import { CountryData } from "@/types/country-data";
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceArea } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { X, Grid2X2, Grid3X3, Square, MousePointer2, Maximize2 } from "lucide-react";
+import { X, Grid2X2, Grid3X3, Grid, MousePointer2, Maximize2 } from "lucide-react";
 import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface ScatterPlotMatrixProps {
@@ -35,7 +35,7 @@ const attributeOptions: AttributeOption[] = [
   { key: "Median_Age", label: "Median Age" },
 ];
 
-type MatrixSize = "1x1" | "2x2" | "3x3";
+type MatrixSize = "2x2" | "3x3" | "4x4";
 
 export const ScatterPlotMatrix = ({
   data,
@@ -61,7 +61,7 @@ export const ScatterPlotMatrix = ({
   const [brushStart, setBrushStart] = useState<{ x: number; y: number } | null>(null);
   const [brushEnd, setBrushEnd] = useState<{ x: number; y: number } | null>(null);
 
-  const gridSize = matrixSize === "1x1" ? 1 : matrixSize === "2x2" ? 2 : 3;
+  const gridSize = matrixSize === "2x2" ? 2 : matrixSize === "3x3" ? 3 : 4;
   const requiredAttributes = gridSize;
 
   // Ensure we have enough attributes selected
@@ -317,11 +317,82 @@ export const ScatterPlotMatrix = ({
     return cells;
   };
 
-  const matrixContent = (fullscreen = false) => (
-    <div className={`grid gap-1 ${fullscreen ? "h-full" : "flex-1 min-h-0"}`} style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}>
-      {renderMatrix()}
-    </div>
-  );
+  // Render normal scatter plot for 2x2
+  const renderNormalScatter = () => {
+    const xAttr = activeAttributes[0];
+    const yAttr = activeAttributes[1];
+    const scatterData = getScatterData(xAttr, yAttr);
+    
+    return (
+      <div className="h-full w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 40 }}>
+            <XAxis
+              type="number"
+              dataKey="x"
+              name={getLabel(xAttr)}
+              tick={{ fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: "hsl(var(--border))" }}
+              label={{ value: getLabel(xAttr), position: "insideBottom", offset: -5, fontSize: 10 }}
+            />
+            <YAxis
+              type="number"
+              dataKey="y"
+              name={getLabel(yAttr)}
+              tick={{ fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: "hsl(var(--border))" }}
+              label={{ value: getLabel(yAttr), angle: -90, position: "insideLeft", fontSize: 10 }}
+            />
+            <Tooltip
+              cursor={{ strokeDasharray: "3 3" }}
+              contentStyle={{
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: "8px",
+                fontSize: "12px",
+              }}
+              formatter={(value: number) => [value.toFixed(2)]}
+              labelFormatter={(_, payload) => payload[0]?.payload?.name || ""}
+            />
+            <Scatter
+              data={scatterData}
+              onClick={(data) => {
+                if (!brushMode) {
+                  const entry = data as typeof scatterData[0];
+                  if (entry?.country) handlePointClick(entry.country);
+                }
+              }}
+            >
+              {scatterData.map((entry) => (
+                <Cell
+                  key={entry.country.countryCode}
+                  fill={getPointColor(entry.country.countryCode)}
+                  style={{ cursor: brushMode ? "crosshair" : "pointer" }}
+                  r={4}
+                />
+              ))}
+            </Scatter>
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  const matrixContent = (fullscreen = false) => {
+    // For 2x2, show normal scatter plot
+    if (matrixSize === "2x2") {
+      return renderNormalScatter();
+    }
+    
+    // For 3x3 and 4x4, show matrix
+    return (
+      <div className={`grid gap-1 ${fullscreen ? "h-full" : "flex-1 min-h-0"}`} style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}>
+        {renderMatrix()}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -343,14 +414,14 @@ export const ScatterPlotMatrix = ({
               <MousePointer2 className="h-3 w-3" />
             </Button>
             <div className="flex items-center border rounded overflow-hidden">
-              <Button variant={matrixSize === "1x1" ? "default" : "ghost"} size="sm" onClick={() => setMatrixSize("1x1")} className="rounded-none px-2 h-6">
-                <Square className="h-3 w-3" />
-              </Button>
               <Button variant={matrixSize === "2x2" ? "default" : "ghost"} size="sm" onClick={() => setMatrixSize("2x2")} className="rounded-none px-2 h-6">
                 <Grid2X2 className="h-3 w-3" />
               </Button>
               <Button variant={matrixSize === "3x3" ? "default" : "ghost"} size="sm" onClick={() => setMatrixSize("3x3")} className="rounded-none px-2 h-6">
                 <Grid3X3 className="h-3 w-3" />
+              </Button>
+              <Button variant={matrixSize === "4x4" ? "default" : "ghost"} size="sm" onClick={() => setMatrixSize("4x4")} className="rounded-none px-2 h-6">
+                <Grid className="h-3 w-3" />
               </Button>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(true)} className="h-6 w-6 p-0">
@@ -361,7 +432,7 @@ export const ScatterPlotMatrix = ({
 
         {/* Compact attribute selectors */}
         <div className="flex flex-wrap gap-1 mb-1 flex-shrink-0">
-          {activeAttributes.map((attr, index) => (
+          {activeAttributes.slice(0, matrixSize === "2x2" ? 2 : gridSize).map((attr, index) => (
             <Select key={index} value={attr} onValueChange={(value) => handleAttributeChange(index, value as keyof CountryData)}>
               <SelectTrigger className="w-[100px] h-6 text-xs">
                 <SelectValue />
