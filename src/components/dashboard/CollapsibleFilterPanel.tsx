@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FilterState, CountryData } from "@/types/country-data";
-import { RotateCcw, ChevronLeft, ChevronRight, Filter, X, Users } from "lucide-react";
+import { RotateCcw, ChevronLeft, ChevronRight, Filter, X, Users, Info } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CollapsibleFilterPanelProps {
   filters: FilterState;
@@ -29,6 +35,70 @@ export const CollapsibleFilterPanel = ({
   const [isOpen, setIsOpen] = useState(true);
   const [countrySearch, setCountrySearch] = useState("");
   const [activeTab, setActiveTab] = useState<"range" | "countries">("range");
+
+  // Calculate data distributions for scented widgets
+  const getDataDistribution = (field: keyof CountryData, bins: number = 10) => {
+    const values = countryData
+      .map(c => c[field])
+      .filter((v): v is number => typeof v === "number" && !isNaN(v));
+    
+    if (values.length === 0) return [];
+    
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const binSize = (max - min) / bins;
+    
+    const distribution = new Array(bins).fill(0);
+    values.forEach(v => {
+      const binIndex = Math.min(Math.floor((v - min) / binSize), bins - 1);
+      distribution[binIndex]++;
+    });
+    
+    return distribution;
+  };
+
+  // Scented widget component
+  const ScentedWidget = ({ data, height = 20 }: { data: number[], height?: number }) => {
+    if (data.length === 0) return null;
+    const maxValue = Math.max(...data);
+    return (
+      <div className="flex items-end gap-[1px] h-5 w-full mt-1">
+        {data.map((value, i) => (
+          <div
+            key={i}
+            className="flex-1 bg-primary/30 rounded-sm transition-all hover:bg-primary/50"
+            style={{ height: `${(value / maxValue) * 100}%` }}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Calculate data statistics
+  const dataStats = useMemo(() => {
+    const getStats = (field: keyof CountryData) => {
+      const values = countryData
+        .map(c => c[field])
+        .filter((v): v is number => typeof v === "number" && !isNaN(v));
+      
+      if (values.length === 0) return { min: 0, max: 0, avg: 0, count: 0 };
+      
+      return {
+        min: Math.min(...values),
+        max: Math.max(...values),
+        avg: values.reduce((a, b) => a + b, 0) / values.length,
+        count: values.length
+      };
+    };
+
+    return {
+      electricity: getStats("electricity_access_percent"),
+      electricityCap: getStats("electricity_capacity_per_capita"),
+      temp: getStats("Mean_Temp"),
+      gdp: getStats("Real_GDP_per_Capita_USD"),
+      internet: getStats("internet_users_per_100"),
+    };
+  }, [countryData]);
 
   const resetFilters = () => {
     onFilterChange({
@@ -126,11 +196,27 @@ export const CollapsibleFilterPanel = ({
               <>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium">Renewable Energy %</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">Renewable Energy %</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Electricity Access %</p>
+                            <p className="text-xs font-mono">Range: {dataStats.electricity.min.toFixed(1)}% - {dataStats.electricity.max.toFixed(1)}%</p>
+                            <p className="text-xs font-mono">Avg: {dataStats.electricity.avg.toFixed(1)}%</p>
+                            <p className="text-xs text-muted-foreground">{dataStats.electricity.count} countries</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <span className="text-xs font-semibold text-primary">
                       {filters.renewableEnergy[0]}% - {filters.renewableEnergy[1]}%
                     </span>
                   </div>
+                  <ScentedWidget data={getDataDistribution("electricity_access_percent")} />
                   <Slider
                     value={filters.renewableEnergy}
                     onValueChange={(value) =>
@@ -145,11 +231,27 @@ export const CollapsibleFilterPanel = ({
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium">Electricity Cost ($/kWh)</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">Electricity Cost ($/kWh)</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Electricity Capacity per Capita</p>
+                            <p className="text-xs font-mono">Range: {dataStats.electricityCap.min.toFixed(2)} - {dataStats.electricityCap.max.toFixed(2)}</p>
+                            <p className="text-xs font-mono">Avg: {dataStats.electricityCap.avg.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">{dataStats.electricityCap.count} countries</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <span className="text-xs font-semibold text-primary">
                       ${(filters.electricityCost[0] / 100).toFixed(2)} - ${(filters.electricityCost[1] / 100).toFixed(2)}
                     </span>
                   </div>
+                  <ScentedWidget data={getDataDistribution("electricity_capacity_per_capita")} />
                   <Slider
                     value={filters.electricityCost}
                     onValueChange={(value) =>
@@ -164,11 +266,27 @@ export const CollapsibleFilterPanel = ({
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium">Avg Temperature (°C)</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">Avg Temperature (°C)</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Mean Temperature</p>
+                            <p className="text-xs font-mono">Range: {dataStats.temp.min.toFixed(1)}°C - {dataStats.temp.max.toFixed(1)}°C</p>
+                            <p className="text-xs font-mono">Avg: {dataStats.temp.avg.toFixed(1)}°C</p>
+                            <p className="text-xs text-muted-foreground">{dataStats.temp.count} countries</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <span className="text-xs font-semibold text-primary">
                       {filters.temperature[0]}°C - {filters.temperature[1]}°C
                     </span>
                   </div>
+                  <ScentedWidget data={getDataDistribution("Mean_Temp")} />
                   <Slider
                     value={filters.temperature}
                     onValueChange={(value) =>
@@ -183,11 +301,27 @@ export const CollapsibleFilterPanel = ({
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium">GDP per Capita ($)</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">GDP per Capita ($)</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Real GDP per Capita (USD)</p>
+                            <p className="text-xs font-mono">Range: ${dataStats.gdp.min.toLocaleString()} - ${dataStats.gdp.max.toLocaleString()}</p>
+                            <p className="text-xs font-mono">Avg: ${dataStats.gdp.avg.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                            <p className="text-xs text-muted-foreground">{dataStats.gdp.count} countries</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <span className="text-xs font-semibold text-primary">
                       ${filters.gdp[0].toLocaleString()} - ${filters.gdp[1].toLocaleString()}
                     </span>
                   </div>
+                  <ScentedWidget data={getDataDistribution("Real_GDP_per_Capita_USD")} />
                   <Slider
                     value={filters.gdp}
                     onValueChange={(value) =>
@@ -202,11 +336,27 @@ export const CollapsibleFilterPanel = ({
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium">Internet Speed (Mbps)</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">Internet Speed (Mbps)</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Internet Users per 100 people</p>
+                            <p className="text-xs font-mono">Range: {dataStats.internet.min.toFixed(1)} - {dataStats.internet.max.toFixed(1)}</p>
+                            <p className="text-xs font-mono">Avg: {dataStats.internet.avg.toFixed(1)}</p>
+                            <p className="text-xs text-muted-foreground">{dataStats.internet.count} countries</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <span className="text-xs font-semibold text-primary">
                       {filters.internetSpeed[0]} - {filters.internetSpeed[1]}
                     </span>
                   </div>
+                  <ScentedWidget data={getDataDistribution("internet_users_per_100")} />
                   <Slider
                     value={filters.internetSpeed}
                     onValueChange={(value) =>
