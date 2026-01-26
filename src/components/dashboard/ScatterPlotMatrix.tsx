@@ -44,12 +44,15 @@ export const ScatterPlotMatrix = ({
   highlightedCountries,
   onBrushSelection,
 }: ScatterPlotMatrixProps) => {
-  const [matrixSize, setMatrixSize] = useState<MatrixSize>("2x2");
+  console.log("🔍 ScatterPlotMatrix render:", { dataLength: data?.length, activeCountry: activeCountry?.country, highlightedCount: highlightedCountries?.size });
+  
+  const [matrixSize, setMatrixSize] = useState<MatrixSize>("3x3");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedAttributes, setSelectedAttributes] = useState<(keyof CountryData)[]>([
     "Real_GDP_per_Capita_USD",
     "co2_per_capita_tonnes",
     "internet_users_per_100",
+    "electricity_capacity_per_capita",
   ]);
   const [brushMode, setBrushMode] = useState(false);
   

@@ -48,7 +48,7 @@ export async function loadCiaFinalData(): Promise<CountryData[]> {
   return new Promise((resolve, reject) => {
     const csvPath = "/CIA_finaldata.csv";
     
-    console.log("🔍 Loading CIA_finaldata.csv...");
+    console.log("🔍 Loading CIA_finaldata.csv...", { csvPath });
     
     Papa.parse<CiaFinalDataRow>(csvPath, {
       download: true,

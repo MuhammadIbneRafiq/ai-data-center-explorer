@@ -3,6 +3,12 @@ import { CountryData } from "@/types/country-data";
 import { loadCiaFinalData } from "@/lib/cia-finaldata-loader";
 
 export async function fetchCountryData(): Promise<CountryData[]> {
+  // Load CSV data directly to avoid Supabase timeout delays
+  console.log("📁 Loading CSV data directly...");
+  return await loadCiaFinalData();
+  
+  // Original Supabase logic (commented out for faster loading)
+  /*
   try {
     const { data, error } = await supabase
       .from("country_data")
@@ -42,6 +48,7 @@ export async function fetchCountryData(): Promise<CountryData[]> {
     console.error("Error fetching country data from Supabase, falling back to CSV data:", error);
     return await loadCiaFinalData();
   }
+  */
 }
 
 export async function insertSampleData() {

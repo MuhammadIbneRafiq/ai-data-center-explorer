@@ -72,27 +72,12 @@ export const CollapsibleFilterPanel = ({
   return (
     <div
       className={cn(
-        "fixed right-0 top-0 h-full z-50 transition-all duration-300 ease-in-out flex",
-        isOpen ? "translate-x-0" : "translate-x-[calc(100%-40px)]"
+        "fixed left-0 top-0 h-full z-50 transition-all duration-300 ease-in-out flex",
+        isOpen ? "translate-x-0" : "-translate-x-[calc(100%-40px)]"
       )}
     >
-      {/* Toggle button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="h-32 w-10 bg-primary text-primary-foreground rounded-l-lg flex items-center justify-center self-center hover:bg-primary/90 transition-colors shadow-lg"
-      >
-        {isOpen ? (
-          <ChevronRight className="h-5 w-5" />
-        ) : (
-          <div className="flex flex-col items-center gap-1">
-            <Filter className="h-4 w-4" />
-            <ChevronLeft className="h-4 w-4" />
-          </div>
-        )}
-      </button>
-
       {/* Filter panel */}
-      <Card className="w-80 h-full rounded-none border-l shadow-2xl bg-card/95 backdrop-blur-md">
+      <Card className="w-80 h-full rounded-none border-r shadow-2xl bg-card/95 backdrop-blur-md">
         <div className="p-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Filter className="h-5 w-5" />
@@ -120,7 +105,7 @@ export const CollapsibleFilterPanel = ({
           <button
             onClick={() => setActiveTab("countries")}
             className={cn(
-              "flex-1 py-2 px-4 text-sm font-medium transition-colors relative",
+              "flex-1 py-2 px-4 text-sm font-medium relative",
               activeTab === "countries"
                 ? "border-b-2 border-primary text-primary"
                 : "text-muted-foreground hover:text-foreground"
@@ -153,7 +138,7 @@ export const CollapsibleFilterPanel = ({
                     }
                     min={0}
                     max={100}
-                    step={5}
+                    step={1}
                     className="w-full"
                   />
                 </div>
@@ -162,7 +147,7 @@ export const CollapsibleFilterPanel = ({
                   <div className="flex justify-between items-center">
                     <Label className="text-sm font-medium">Electricity Cost ($/kWh)</Label>
                     <span className="text-xs font-semibold text-primary">
-                      ${filters.electricityCost[0]} - ${filters.electricityCost[1]}
+                      ${(filters.electricityCost[0] / 100).toFixed(2)} - ${(filters.electricityCost[1] / 100).toFixed(2)}
                     </span>
                   </div>
                   <Slider
@@ -172,7 +157,7 @@ export const CollapsibleFilterPanel = ({
                     }
                     min={0}
                     max={100}
-                    step={5}
+                    step={1}
                     className="w-full"
                   />
                 </div>
@@ -191,7 +176,7 @@ export const CollapsibleFilterPanel = ({
                     }
                     min={-20}
                     max={50}
-                    step={5}
+                    step={1}
                     className="w-full"
                   />
                 </div>
@@ -209,8 +194,8 @@ export const CollapsibleFilterPanel = ({
                       onFilterChange({ ...filters, gdp: value as [number, number] })
                     }
                     min={0}
-                    max={100000}
-                    step={5000}
+                    max={200000}
+                    step={1000}
                     className="w-full"
                   />
                 </div>
@@ -219,7 +204,7 @@ export const CollapsibleFilterPanel = ({
                   <div className="flex justify-between items-center">
                     <Label className="text-sm font-medium">Internet Speed (Mbps)</Label>
                     <span className="text-xs font-semibold text-primary">
-                      {filters.internetSpeed[0]} - {filters.internetSpeed[1]} Mbps
+                      {filters.internetSpeed[0]} - {filters.internetSpeed[1]}
                     </span>
                   </div>
                   <Slider
@@ -229,24 +214,23 @@ export const CollapsibleFilterPanel = ({
                     }
                     min={0}
                     max={1000}
-                    step={50}
+                    step={10}
                     className="w-full"
                   />
                 </div>
 
-                <div className="pt-4 border-t">
+                <div className="space-y-3">
                   <Label className="text-sm font-medium mb-3 block">Display Metric</Label>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {[
-                      { value: "renewableEnergyPercent", label: "Renewable Energy %" },
-                      { value: "electricityCost", label: "Electricity Cost ($/kWh)" },
-                      { value: "internetSpeed", label: "Internet Metric" },
-                      { value: "gdpPerCapita", label: "GDP per Capita" },
+                      { value: "renewableEnergyPercent", label: "Renewable %" },
+                      { value: "gdpPerCapita", label: "GDP/Capita" },
+                      { value: "internetSpeed", label: "Internet" },
+                      { value: "electricityCost", label: "Electricity" },
                     ].map((metric) => (
                       <Button
                         key={metric.value}
                         variant={filters.selectedMetric === metric.value ? "default" : "outline"}
-                        className="w-full justify-start"
                         size="sm"
                         onClick={() =>
                           onFilterChange({ ...filters, selectedMetric: metric.value })
@@ -327,6 +311,21 @@ export const CollapsibleFilterPanel = ({
           </div>
         </ScrollArea>
       </Card>
+
+      {/* Toggle button - positioned on the far right edge */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="h-32 w-10 bg-primary text-primary-foreground rounded-r-lg flex items-center justify-center self-center hover:bg-primary/90 transition-colors shadow-lg"
+      >
+        {isOpen ? (
+          <ChevronLeft className="h-5 w-5" />
+        ) : (
+          <div className="flex flex-col items-center gap-1">
+            <Filter className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" />
+          </div>
+        )}
+      </button>
     </div>
   );
 };

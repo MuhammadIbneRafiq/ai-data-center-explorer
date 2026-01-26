@@ -25,7 +25,7 @@ const Index = () => {
     renewableEnergy: [0, 100],
     electricityCost: [0, 100],
     temperature: [-20, 50],
-    gdp: [0, 100000],
+    gdp: [0, 200000], // Increased max GDP to include more countries
     internetSpeed: [0, 1000],
     selectedMetric: "renewableEnergyPercent",
     selectedCountries: [],
@@ -65,7 +65,9 @@ const Index = () => {
   const loadCountryData = async () => {
     try {
       setLoading(true);
+      console.log("🔍 Starting country data load...");
       const data = await fetchCountryData();
+      console.log("✅ Country data loaded:", { count: data.length, sample: data.slice(0, 3) });
       setCountryData(data);
 
       if (data.length === 0) {
@@ -87,47 +89,51 @@ const Index = () => {
   };
 
   const filteredData = countryData.filter((country) => {
+    // Use the actual field names from the CSV data
     if (
-      country.renewableEnergyPercent !== undefined &&
-      (country.renewableEnergyPercent < filters.renewableEnergy[0] ||
-        country.renewableEnergyPercent > filters.renewableEnergy[1])
+      country.electricity_access_percent !== undefined &&
+      (country.electricity_access_percent < filters.renewableEnergy[0] ||
+        country.electricity_access_percent > filters.renewableEnergy[1])
+    ) {
+      return false;
+    }
+
+    // Skip electricity cost filtering for now as it's not in the CSV data
+    // if (
+    //   country.electricityCost !== undefined &&
+    //   (country.electricityCost < filters.electricityCost[0] / 100 ||
+    //     country.electricityCost > filters.electricityCost[1] / 100)
+    // ) {
+    //   return false;
+    // }
+
+    if (
+      country.Mean_Temp !== undefined &&
+      (country.Mean_Temp < filters.temperature[0] ||
+        country.Mean_Temp > filters.temperature[1])
     ) {
       return false;
     }
 
     if (
-      country.electricityCost !== undefined &&
-      (country.electricityCost < filters.electricityCost[0] / 100 ||
-        country.electricityCost > filters.electricityCost[1] / 100)
+      country.Real_GDP_per_Capita_USD !== undefined &&
+      (country.Real_GDP_per_Capita_USD < filters.gdp[0] || country.Real_GDP_per_Capita_USD > filters.gdp[1])
     ) {
       return false;
     }
 
     if (
-      country.averageTemperature !== undefined &&
-      (country.averageTemperature < filters.temperature[0] ||
-        country.averageTemperature > filters.temperature[1])
-    ) {
-      return false;
-    }
-
-    if (
-      country.gdpPerCapita !== undefined &&
-      (country.gdpPerCapita < filters.gdp[0] || country.gdpPerCapita > filters.gdp[1])
-    ) {
-      return false;
-    }
-
-    if (
-      country.internetSpeed !== undefined &&
-      (country.internetSpeed < filters.internetSpeed[0] ||
-        country.internetSpeed > filters.internetSpeed[1])
+      country.internet_users_per_100 !== undefined &&
+      (country.internet_users_per_100 < filters.internetSpeed[0] ||
+        country.internet_users_per_100 > filters.internetSpeed[1])
     ) {
       return false;
     }
 
     return true;
   });
+
+  console.log("🔍 Filter data:", { total: countryData.length, filtered: filteredData.length, filters });
 
 
   const handleSpiderCountrySelect = (
@@ -178,7 +184,7 @@ const Index = () => {
         highlightedCountries={highlightedCountries}
         onHighlightedCountriesChange={setHighlightedCountries}
       />
-      <div className="h-screen flex flex-col bg-background p-3 pr-14 overflow-hidden">
+      <div className="h-screen flex flex-col bg-background p-3 pl-14 overflow-hidden">
         {/* Compact Header */}
         <header className="flex items-center justify-between flex-shrink-0 mb-2">
           <div className="flex-1">
