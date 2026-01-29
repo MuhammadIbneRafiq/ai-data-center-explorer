@@ -23,6 +23,8 @@ interface CollapsibleFilterPanelProps {
   countryData: CountryData[];
   highlightedCountries?: Set<string>;
   onHighlightedCountriesChange?: (countries: Set<string>) => void;
+  isOpen?: boolean;
+  onToggle?: (open: boolean) => void;
 }
 
 export const CollapsibleFilterPanel = ({
@@ -31,8 +33,14 @@ export const CollapsibleFilterPanel = ({
   countryData,
   highlightedCountries,
   onHighlightedCountriesChange,
+  isOpen: externalIsOpen,
+  onToggle,
 }: CollapsibleFilterPanelProps) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [internalIsOpen, setInternalIsOpen] = useState(true);
+  
+  // Use external state if provided, otherwise use internal state
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = onToggle || setInternalIsOpen;
   const [countrySearch, setCountrySearch] = useState("");
   const [activeTab, setActiveTab] = useState<"range" | "countries">("range");
 
@@ -147,7 +155,7 @@ export const CollapsibleFilterPanel = ({
       )}
     >
       {/* Filter panel */}
-      <Card className="w-80 h-full rounded-none border-r shadow-2xl bg-card/95 backdrop-blur-md">
+      <Card className="w-96 h-full rounded-none border-r shadow-2xl bg-card/95 backdrop-blur-md">
         <div className="p-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Filter className="h-5 w-5" />
@@ -395,7 +403,7 @@ export const CollapsibleFilterPanel = ({
             ) : (
               <>
                 {/* Country filter tab */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">Filter by Countries</span>
@@ -405,55 +413,78 @@ export const CollapsibleFilterPanel = ({
                     placeholder="Search countries..."
                     value={countrySearch}
                     onChange={(e) => setCountrySearch(e.target.value)}
-                    className="h-9"
+                    className="h-8 text-xs"
                   />
 
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={selectAllVisible} className="flex-1 text-xs">
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" onClick={selectAllVisible} className="flex-1 h-7 text-xs">
                       Select All
                     </Button>
-                    <Button variant="outline" size="sm" onClick={clearAllCountries} className="flex-1 text-xs">
+                    <Button variant="outline" size="sm" onClick={clearAllCountries} className="flex-1 h-7 text-xs">
                       Clear All
                     </Button>
                   </div>
 
                   {/* Selected countries badges */}
                   {highlightedCountries && highlightedCountries.size > 0 && (
-                    <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-lg">
-                      {Array.from(highlightedCountries).slice(0, 10).map(code => {
+                    <div className="flex flex-wrap gap-1 p-1.5 bg-muted/50 rounded-lg">
+                      {Array.from(highlightedCountries).slice(0, 8).map(code => {
                         const country = countryData.find(c => c.countryCode === code);
                         return (
                           <Badge
                             key={code}
                             variant="secondary"
-                            className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                            className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground text-xs h-5"
                             onClick={() => toggleCountry(code)}
                           >
-                            {country?.country?.slice(0, 12) || code}
-                            <X className="h-3 w-3 ml-1" />
+                            {country?.country?.slice(0, 10) || code}
+                            <X className="h-2 w-2 ml-1" />
                           </Badge>
                         );
                       })}
-                      {highlightedCountries.size > 10 && (
-                        <Badge variant="outline">+{highlightedCountries.size - 10} more</Badge>
+                      {highlightedCountries.size > 8 && (
+                        <Badge variant="outline" className="text-xs h-5">+{highlightedCountries.size - 8} more</Badge>
                       )}
                     </div>
                   )}
 
-                  {/* Country list */}
+                  {/* Country list with data bars */}
                   <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                    {filteredCountries.map(country => (
-                      <label
-                        key={country.countryCode}
-                        className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={highlightedCountries?.has(country.countryCode) || false}
-                          onCheckedChange={() => toggleCountry(country.countryCode)}
-                        />
-                        <span className="text-sm truncate">{country.country}</span>
-                      </label>
-                    ))}
+                    {filteredCountries.map(country => {
+                      // Get a representative data value for the bar (e.g., GDP)
+                      const dataValue = country.Real_GDP_per_Capita_USD || 0;
+                      const maxValue = Math.max(...filteredCountries.map(c => c.Real_GDP_per_Capita_USD || 0));
+                      const barWidth = maxValue > 0 ? (dataValue / maxValue) * 100 : 0;
+                      
+                      return (
+                        <div
+                          key={country.countryCode}
+                          className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer group"
+                          onClick={() => toggleCountry(country.countryCode)}
+                        >
+                          <Checkbox
+                            checked={highlightedCountries?.has(country.countryCode) || false}
+                            onCheckedChange={() => toggleCountry(country.countryCode)}
+                            className="shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-medium truncate">{country.country}</span>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                ${dataValue ? dataValue.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'}
+                              </span>
+                            </div>
+                            {/* Data bar */}
+                            <div className="w-full bg-muted rounded-full h-1.5 mt-0.5 overflow-hidden">
+                              <div 
+                                className="h-full bg-primary/60 rounded-full transition-all duration-200 group-hover:bg-primary/80"
+                                style={{ width: `${barWidth}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </>

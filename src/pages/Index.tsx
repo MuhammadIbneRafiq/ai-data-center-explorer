@@ -36,6 +36,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
   const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { toast } = useToast();
 
   // Panel sizes state for resizable panels
@@ -183,8 +184,12 @@ const Index = () => {
         countryData={countryData}
         highlightedCountries={highlightedCountries}
         onHighlightedCountriesChange={setHighlightedCountries}
+        isOpen={isSidebarOpen}
+        onToggle={setIsSidebarOpen}
       />
-      <div className="h-screen flex flex-col bg-background p-3 pl-14 overflow-hidden">
+      <div className={`h-screen flex flex-col bg-background p-2 overflow-hidden transition-all duration-300 ${
+        isSidebarOpen ? 'pl-[384px]' : 'pl-2'
+      }`}>
         {/* Compact Header */}
         <header className="flex items-center justify-between flex-shrink-0 mb-2">
           <div className="flex-1">

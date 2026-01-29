@@ -78,12 +78,15 @@ export const InteractiveParallelCoordinates = ({
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(true);
   const [localSelection, setLocalSelection] = useState<Set<string>>(new Set());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateDimensions = () => {
-      if (svgRef.current) {
-        const rect = svgRef.current.getBoundingClientRect();
-        setDimensions({ width: rect.width, height: rect.height || 300 });
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        // Set a minimum height to prevent collapse
+        const height = Math.max(rect.height, 250);
+        setDimensions({ width: rect.width || 800, height });
       }
     };
     
@@ -91,9 +94,17 @@ export const InteractiveParallelCoordinates = ({
     window.addEventListener('resize', updateDimensions);
     // Also update on initial render after a short delay to get correct dimensions
     const timeout = setTimeout(updateDimensions, 100);
+    
+    // Create a ResizeObserver to detect container size changes
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
     return () => {
       window.removeEventListener('resize', updateDimensions);
       clearTimeout(timeout);
+      resizeObserver.disconnect();
     };
   }, []);
 
@@ -211,17 +222,46 @@ export const InteractiveParallelCoordinates = ({
     ? highlightedCountries 
     : localSelection;
 
+  // Color palette for categorical colors
+  const colorPalette = [
+    "hsl(var(--chart-1))", 
+    "hsl(var(--chart-2))", 
+    "hsl(var(--chart-3))", 
+    "hsl(var(--chart-4))", 
+    "hsl(var(--chart-5))", 
+    "hsl(var(--chart-6))", 
+    "hsl(var(--chart-7))", 
+    "hsl(var(--chart-8))"
+  ];
+
+  // Get color index for a country
+  const getColorIndex = (countryCode: string) => {
+    // If there's a highlighted set, find the index of this country within it
+    if (effectiveSelection.size > 0 && effectiveSelection.has(countryCode)) {
+      // Convert to array to get stable indices
+      const selectionArray = Array.from(effectiveSelection);
+      const index = selectionArray.indexOf(countryCode);
+      return index % colorPalette.length;
+    }
+    // For selected countries
+    if (selectedCountries) {
+      const index = selectedCountries.findIndex(c => c.countryCode === countryCode);
+      if (index !== -1) return index % colorPalette.length;
+    }
+    return 0;
+  };
+
   const getLineColor = (countryCode: string) => {
     if (hoveredCountry === countryCode) {
       return "hsl(var(--chart-3))";
     }
     if (effectiveSelection.size > 0) {
       return effectiveSelection.has(countryCode) 
-        ? "hsl(var(--chart-1))" 
+        ? colorPalette[getColorIndex(countryCode)] 
         : "hsl(var(--muted-foreground) / 0.1)";
     }
     if (selectedCountries && selectedCountries.some(c => c.countryCode === countryCode)) {
-      return "hsl(var(--chart-2))";
+      return colorPalette[getColorIndex(countryCode)];
     }
     return "hsl(var(--muted-foreground) / 0.3)";
   };
@@ -246,7 +286,7 @@ export const InteractiveParallelCoordinates = ({
   const parallelContent = (fullscreen = false) => {
     // Calculate dimensions based on whether we're in fullscreen
     const contentDimensions = fullscreen 
-      ? { width: window.innerWidth * 0.9, height: window.innerHeight * 0.8 }
+      ? { width: window.innerWidth * 0.95, height: window.innerHeight * 0.85 }
       : dimensions;
 
     // Recalculate layout dimensions for this content
@@ -259,8 +299,8 @@ export const InteractiveParallelCoordinates = ({
       <div className={`relative ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
         <svg
           ref={!fullscreen ? svgRef : undefined}
-          width={contentDimensions.width}
-          height={contentDimensions.height}
+          width="100%"
+          height="100%"
           className="overflow-visible"
           viewBox={`0 0 ${contentDimensions.width} ${contentDimensions.height}`}
           preserveAspectRatio="xMidYMid meet"
@@ -342,7 +382,7 @@ export const InteractiveParallelCoordinates = ({
 
   return (
     <>
-      <Card className="glass-panel p-3 h-full flex flex-col">
+      <Card className="glass-panel p-3 h-full flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-1 mb-1 flex-shrink-0 flex-wrap">
           <h3 className="text-sm font-semibold">Parallel Coords</h3>
           <div className="flex items-center gap-1">
@@ -403,11 +443,15 @@ export const InteractiveParallelCoordinates = ({
           ))}
         </div>
 
-        {parallelContent()}
+        <div ref={containerRef} className="flex-1 min-h-0 w-full overflow-hidden">
+          {parallelContent()}
+        </div>
       </Card>
       
       <FullscreenOverlay isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title="Interactive Parallel Coordinates">
-        {parallelContent(true)}
+        <div className="w-full h-full">
+          {parallelContent(true)}
+        </div>
       </FullscreenOverlay>
     </>
   );
