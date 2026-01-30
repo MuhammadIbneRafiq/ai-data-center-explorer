@@ -20,16 +20,43 @@ interface AttributeOption {
 }
 
 const attributeOptions: AttributeOption[] = [
+  // Basic info
+  { key: "Mean_Temp", label: "Mean Temperature" },
+  { key: "Median_Age", label: "Median Age" },
+  
+  // Economy
+  { key: "Real_GDP_PPP_billion_USD", label: "GDP (PPP)" },
   { key: "Real_GDP_per_Capita_USD", label: "GDP per Capita" },
+  { key: "Real_GDP_Growth_Rate_percent", label: "GDP Growth Rate" },
+  { key: "Youth_Unemployment_Rate_percent", label: "Youth Unemployment" },
+  
+  // Demographics
+  { key: "Population_Growth_Rate", label: "Population Growth" },
+  { key: "Total_Literacy_Rate", label: "Literacy Rate" },
+  
+  // Energy & Infrastructure
+  { key: "electricity_access_percent", label: "Electricity Access" },
   { key: "electricity_capacity_per_capita", label: "Electric Capacity" },
+  
+  // Connectivity
   { key: "internet_users_per_100", label: "Internet Users" },
+  { key: "broadband_subs_per_100", label: "Broadband Subscribers" },
+  { key: "mobile_subs_per_100", label: "Mobile Subscribers" },
+  
+  // Demographics & Geography
+  { key: "population_density", label: "Population Density" },
+  { key: "road_density_per_1000km2", label: "Road Density" },
+  { key: "rail_density_per_1000km2", label: "Rail Density" },
+  { key: "airports_per_million", label: "Airports per Million" },
+  
+  // Environmental
   { key: "co2_per_capita_tonnes", label: "CO₂ per Capita" },
   { key: "co2_per_gdp_tonnes_per_billion", label: "CO₂ per GDP" },
-  { key: "Unemployment_Rate_percent", label: "Unemployment Rate" },
-  { key: "Population_Growth_Rate", label: "Population Growth" },
-  { key: "electricity_access_percent", label: "Electricity Access" },
-  { key: "broadband_subs_per_100", label: "Broadband Subs" },
-  { key: "road_density_per_1000km2", label: "Road Density" },
+  { key: "fossil_intensity_index", label: "Fossil Intensity Index" },
+  
+  // Geography & Environment
+  { key: "water_share", label: "Water Share" },
+  { key: "coastline_per_1000km2", label: "Coastline Density" },
 ];
 
 export const EnhancedScatterPlot = ({

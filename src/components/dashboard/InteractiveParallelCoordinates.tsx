@@ -12,6 +12,9 @@ interface InteractiveParallelCoordinatesProps {
   onCountrySelect?: (country: CountryData) => void;
   highlightedCountries?: Set<string>;
   onMultiSelect?: (countryCodes: Set<string>) => void;
+  // Support coordinated views with brushing and linking
+  brushEnabled?: boolean;
+  brushMode?: "select" | "hover";
 }
 
 interface Attribute {
@@ -62,6 +65,8 @@ export const InteractiveParallelCoordinates = ({
   onCountrySelect,
   highlightedCountries,
   onMultiSelect,
+  brushEnabled = true,
+  brushMode = "select",
 }: InteractiveParallelCoordinatesProps) => {
   const [selectedAttributes, setSelectedAttributes] = useState<Attribute[]>([
     availableAttributes.find(a => a.key === "Real_GDP_per_Capita_USD")!,
@@ -79,6 +84,12 @@ export const InteractiveParallelCoordinates = ({
   const [localSelection, setLocalSelection] = useState<Set<string>>(new Set());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Flexible axis scaling - for distorted zooming on specific axes
+  const [axisScales, setAxisScales] = useState<Record<string, number>>({});
+  // Track dragging state for axis scaling
+  const [isDraggingAxis, setIsDraggingAxis] = useState<string | null>(null);
+  const [dragStartY, setDragStartY] = useState<number | null>(null);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -216,7 +227,20 @@ export const InteractiveParallelCoordinates = ({
   const width = dimensions.width - margin.left - margin.right;
   const height = dimensions.height - margin.top - margin.bottom;
   
-  const axisSpacing = width / (selectedAttributes.length - 1 || 1);
+  // Calculate axis positions with flexible scaling
+  let totalScale = selectedAttributes.reduce((sum, attr) => 
+    sum + (axisScales[attr.key] || 1), 0);
+  
+  if (totalScale === 0) totalScale = selectedAttributes.length;
+  
+  const baseSpacing = width / totalScale;
+  let currentPosition = 0;
+  const axisPositions = selectedAttributes.map(attr => {
+    const scale = axisScales[attr.key] || 1;
+    const position = currentPosition;
+    currentPosition += baseSpacing * scale;
+    return position;
+  });
 
   const effectiveSelection = highlightedCountries && highlightedCountries.size > 0 
     ? highlightedCountries 
@@ -273,9 +297,45 @@ export const InteractiveParallelCoordinates = ({
     return 1;
   };
 
+  // Handle axis drag for scaling
+  const handleAxisMouseDown = useCallback((attrKey: string, e: React.MouseEvent) => {
+    setIsDraggingAxis(attrKey);
+    setDragStartY(e.clientY);
+  }, []);
+  
+  const handleAxisMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDraggingAxis || dragStartY === null) return;
+    
+    // Calculate drag distance and convert to scale factor
+    const dragDelta = dragStartY - e.clientY;
+    const scaleFactor = Math.max(0.5, Math.min(3, 1 + (dragDelta / 200)));
+    
+    setAxisScales(prev => ({
+      ...prev,
+      [isDraggingAxis]: scaleFactor
+    }));
+  }, [isDraggingAxis, dragStartY]);
+  
+  const handleAxisMouseUp = useCallback(() => {
+    setIsDraggingAxis(null);
+    setDragStartY(null);
+  }, []);
+  
+  useEffect(() => {
+    if (isDraggingAxis) {
+      window.addEventListener('mousemove', handleAxisMouseMove as any);
+      window.addEventListener('mouseup', handleAxisMouseUp);
+      
+      return () => {
+        window.removeEventListener('mousemove', handleAxisMouseMove as any);
+        window.removeEventListener('mouseup', handleAxisMouseUp);
+      };
+    }
+  }, [isDraggingAxis, handleAxisMouseMove, handleAxisMouseUp]);
+  
   const generatePath = (normalized: Record<string, number>) => {
     const points = selectedAttributes.map((attr, i) => {
-      const x = i * axisSpacing;
+      const x = axisPositions[i];
       const y = height * (1 - normalized[attr.key]);
       return `${x},${y}`;
     });
@@ -285,15 +345,29 @@ export const InteractiveParallelCoordinates = ({
 
   const parallelContent = (fullscreen = false) => {
     // Calculate dimensions based on whether we're in fullscreen
-    const contentDimensions = fullscreen 
-      ? { width: window.innerWidth * 0.95, height: window.innerHeight * 0.85 }
-      : dimensions;
+  const contentDimensions = fullscreen 
+    ? { width: window.innerWidth * 0.95, height: window.innerHeight * 0.85 }
+    : dimensions;
 
-    // Recalculate layout dimensions for this content
-    const margin = { top: 60, right: 40, bottom: 40, left: 40 };
-    const width = contentDimensions.width - margin.left - margin.right;
-    const height = contentDimensions.height - margin.top - margin.bottom;
-    const axisSpacing = width / (selectedAttributes.length - 1 || 1);
+  // Recalculate layout dimensions for this content
+  const margin = { top: 60, right: 40, bottom: 40, left: 40 };
+  const width = contentDimensions.width - margin.left - margin.right;
+  const height = contentDimensions.height - margin.top - margin.bottom;
+  
+  // Calculate axis positions with flexible scaling
+  let totalScale = selectedAttributes.reduce((sum, attr) => 
+    sum + (axisScales[attr.key] || 1), 0);
+  
+  if (totalScale === 0) totalScale = selectedAttributes.length;
+  
+  const baseSpacing = width / totalScale;
+  let currentPosition = 0;
+  const axisPositions = selectedAttributes.map(attr => {
+    const scale = axisScales[attr.key] || 1;
+    const position = currentPosition;
+    currentPosition += baseSpacing * scale;
+    return position;
+  });
 
     return (
       <div className={`relative ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
@@ -305,77 +379,93 @@ export const InteractiveParallelCoordinates = ({
           viewBox={`0 0 ${contentDimensions.width} ${contentDimensions.height}`}
           preserveAspectRatio="xMidYMid meet"
         >
-        <g transform={`translate(${margin.left}, ${margin.top})`}>
-          {/* Draw axes */}
-          {selectedAttributes.map((attr, i) => {
-            const x = i * axisSpacing;
-            
-            return (
-              <g key={attr.key}>
-                {/* Axis line */}
-                <line
-                  x1={x}
-                  y1={0}
-                  x2={x}
-                  y2={height}
-                  stroke="hsl(var(--border))"
-                  strokeWidth={2}
-                />
-                
-                {/* Axis label */}
-                <text
-                  x={x}
-                  y={-10}
-                  textAnchor="middle"
-                  fill="hsl(var(--foreground))"
-                  fontSize={fullscreen ? 14 : 12}
-                  fontWeight="600"
-                >
-                  {attr.label}
-                </text>
-                
-                {/* Min/Max labels */}
-                <text
-                  x={x}
-                  y={height + 20}
-                  textAnchor="middle"
-                  fill="hsl(var(--muted-foreground))"
-                  fontSize={fullscreen ? 12 : 10}
-                >
-                  Min
-                </text>
-                <text
-                  x={x}
-                  y={-25}
-                  textAnchor="middle"
-                  fill="hsl(var(--muted-foreground))"
-                  fontSize={fullscreen ? 12 : 10}
-                >
-                  Max
-                </text>
-              </g>
-            );
-          })}
+          <g transform={`translate(${margin.left}, ${margin.top})`}>
+            {/* Draw axes */}
+            {selectedAttributes.map((attr, i) => {
+              const x = axisPositions[i];
+              const scale = axisScales[attr.key] || 1;
+              
+              return (
+                <g key={attr.key}>
+                  {/* Axis line - thicker when emphasized */}
+                  <line
+                    x1={x}
+                    y1={0}
+                    x2={x}
+                    y2={height}
+                    stroke={isDraggingAxis === attr.key ? "hsl(var(--primary))" : "hsl(var(--border))"}
+                    strokeWidth={scale > 1.2 ? 3 : 2}
+                    style={{ cursor: "ns-resize" }}
+                    onMouseDown={(e) => handleAxisMouseDown(attr.key, e)}
+                  />
+                  
+                  {/* Axis label - emphasized when scaled */}
+                  <text
+                    x={x}
+                    y={-10}
+                    textAnchor="middle"
+                    fill={scale > 1.2 ? "hsl(var(--primary))" : "hsl(var(--foreground))"}
+                    fontSize={fullscreen ? 14 * Math.sqrt(scale) : 12 * Math.sqrt(scale)}
+                    fontWeight="600"
+                  >
+                    {attr.label}
+                  </text>
+                  
+                  {/* Min/Max labels */}
+                  <text
+                    x={x}
+                    y={height + 20}
+                    textAnchor="middle"
+                    fill="hsl(var(--muted-foreground))"
+                    fontSize={fullscreen ? 12 : 10}
+                  >
+                    Min
+                  </text>
+                  <text
+                    x={x}
+                    y={-25}
+                    textAnchor="middle"
+                    fill="hsl(var(--muted-foreground))"
+                    fontSize={fullscreen ? 12 : 10}
+                  >
+                    Max
+                  </text>
+                  
+                  {/* Scale indicator */}
+                  {scale !== 1 && (
+                    <text
+                      x={x}
+                      y={-40}
+                      textAnchor="middle"
+                      fill="hsl(var(--primary))"
+                      fontSize={fullscreen ? 12 : 10}
+                    >
+                      {scale.toFixed(1)}×
+                    </text>
+                  )}
+                </g>
+              );
+            })}
 
-          {/* Draw lines for each country */}
-          {normalizedData.map(({ country, normalized }) => (
-            <path
-              key={country.countryCode}
-              d={generatePath(normalized)}
-              fill="none"
-              stroke={getLineColor(country.countryCode)}
-              strokeWidth={getLineWidth(country.countryCode)}
-              opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
-              onMouseEnter={() => setHoveredCountry(country.countryCode)}
-              onMouseLeave={() => setHoveredCountry(null)}
-              onClick={() => handleLineClick(country)}
-              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-            >
-              <title>{country.country}</title>
-            </path>
-          ))}
-        </g>
-      </svg>
+            {/* Draw lines for each country */}
+            {normalizedData.map(({ country, normalized }) => (
+              <path
+                key={country.countryCode}
+                d={generatePath(normalized)}
+                fill="none"
+                stroke={getLineColor(country.countryCode)}
+                strokeWidth={getLineWidth(country.countryCode)}
+                opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
+                onMouseEnter={() => setHoveredCountry(country.countryCode)}
+                onMouseLeave={() => setHoveredCountry(null)}
+                onClick={() => handleLineClick(country)}
+                style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                <title>{country.country}</title>
+              </path>
+            ))}
+          </g>
+        </svg>
     </div>
     );
   };

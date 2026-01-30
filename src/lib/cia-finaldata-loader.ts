@@ -44,6 +44,75 @@ function parseLiteracyRate(value: any): string | undefined {
   return String(value);
 }
 
+/**
+ * Calculate z-scores for selected metrics across all countries
+ * Z-score = (value - mean) / standardDeviation
+ */
+function calculateZScores(countries: CountryData[]): void {
+  // Helper function to calculate mean of a numeric array
+  const calculateMean = (values: number[]): number => {
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  };
+  
+  // Helper function to calculate standard deviation
+  const calculateStdDev = (values: number[], mean: number): number => {
+    const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
+    const variance = calculateMean(squaredDiffs);
+    return Math.sqrt(variance);
+  };
+  
+  // Calculate z-scores for electricity capacity per capita
+  const electricityCapValues = countries
+    .map(c => c.electricity_capacity_per_capita)
+    .filter((val): val is number => val !== undefined && !isNaN(val));
+    
+  if (electricityCapValues.length > 0) {
+    const mean = calculateMean(electricityCapValues);
+    const stdDev = calculateStdDev(electricityCapValues, mean);
+    
+    countries.forEach(country => {
+      if (country.electricity_capacity_per_capita !== undefined) {
+        country.z_electricity_capacity_per_capita = 
+          (country.electricity_capacity_per_capita - mean) / (stdDev || 1);
+      }
+    });
+  }
+  
+  // Calculate z-scores for GDP (PPP)
+  const gdpValues = countries
+    .map(c => c.Real_GDP_PPP_billion_USD)
+    .filter((val): val is number => val !== undefined && !isNaN(val));
+    
+  if (gdpValues.length > 0) {
+    const mean = calculateMean(gdpValues);
+    const stdDev = calculateStdDev(gdpValues, mean);
+    
+    countries.forEach(country => {
+      if (country.Real_GDP_PPP_billion_USD !== undefined) {
+        country.z_real_gdp_ppp = 
+          (country.Real_GDP_PPP_billion_USD - mean) / (stdDev || 1);
+      }
+    });
+  }
+  
+  // Calculate z-scores for CO2 per capita
+  const co2Values = countries
+    .map(c => c.co2_per_capita_tonnes)
+    .filter((val): val is number => val !== undefined && !isNaN(val));
+    
+  if (co2Values.length > 0) {
+    const mean = calculateMean(co2Values);
+    const stdDev = calculateStdDev(co2Values, mean);
+    
+    countries.forEach(country => {
+      if (country.co2_per_capita_tonnes !== undefined) {
+        country.z_co2_per_capita = 
+          (country.co2_per_capita_tonnes - mean) / (stdDev || 1);
+      }
+    });
+  }
+}
+
 export async function loadCiaFinalData(): Promise<CountryData[]> {
   return new Promise((resolve, reject) => {
     const csvPath = "/CIA_finaldata.csv";
@@ -111,6 +180,11 @@ export async function loadCiaFinalData(): Promise<CountryData[]> {
             water_share: parseNumber(row.water_share),
             coastline_per_1000km2: parseNumber(row.coastline_per_1000km2),
             
+            // Z-score fields will be calculated after collecting all data
+            z_electricity_capacity_per_capita: undefined,
+            z_real_gdp_ppp: undefined,
+            z_co2_per_capita: undefined,
+            
             // Legacy mappings for backward compatibility
             gdpPerCapita: parseNumber(row.Real_GDP_per_Capita_USD),
             averageTemperature: parseNumber(row.Mean_Temp),
@@ -124,6 +198,11 @@ export async function loadCiaFinalData(): Promise<CountryData[]> {
         }
         
         console.log(`✅ Successfully loaded ${countries.length} countries with coordinates`);
+        
+        // Calculate z-scores for specific metrics
+        calculateZScores(countries);
+        
+        console.log(`✅ Z-scores calculated for all countries`);
         resolve(countries);
       },
       error: (error) => {

@@ -14,17 +14,52 @@ interface TopCountriesChartProps {
   onCountrySelect?: (country: CountryData) => void;
   highlightedCountries?: Set<string>;
   onBrushSelection?: (countryCodes: Set<string>) => void;
+  // Support coordinated views with brushing and linking
+  brushEnabled?: boolean;
+  brushMode?: "select" | "hover";
 }
 
 const metricLabels: Partial<Record<keyof CountryData, string>> = {
-  renewableEnergyPercent: "Renewable Energy %",
-  electricityCost: "Electricity Cost ($/kWh)",
-  internetSpeed: "Internet Metric",
-  gdpPerCapita: "GDP per Capita",
+  // Basic info
+  Mean_Temp: "Mean Temperature",
+  Median_Age: "Median Age",
+  
+  // Economy
+  Real_GDP_PPP_billion_USD: "GDP (PPP)",
   Real_GDP_per_Capita_USD: "GDP per Capita",
+  Real_GDP_Growth_Rate_percent: "GDP Growth Rate",
+  Youth_Unemployment_Rate_percent: "Youth Unemployment",
+  
+  // Demographics
+  Population_Growth_Rate: "Population Growth",
+  Total_Literacy_Rate: "Literacy Rate",
+  
+  // Energy & Infrastructure
+  electricity_access_percent: "Electricity Access",
   electricity_capacity_per_capita: "Electric Capacity",
+  
+  // Connectivity
   internet_users_per_100: "Internet Users",
+  broadband_subs_per_100: "Broadband Subscribers",
+  mobile_subs_per_100: "Mobile Subscribers",
+  
+  // Demographics & Geography
+  population_density: "Population Density",
+  road_density_per_1000km2: "Road Density",
+  rail_density_per_1000km2: "Rail Density",
+  airports_per_million: "Airports per Million",
+  
+  // Environmental
   co2_per_capita_tonnes: "CO₂ per Capita",
+  co2_per_gdp_tonnes_per_billion: "CO₂ per GDP",
+  fossil_intensity_index: "Fossil Intensity Index",
+  
+  // Geography & Environment
+  water_share: "Water Share",
+  coastline_per_1000km2: "Coastline Density",
+  
+  // No Z-score variants in this component
+  // Keeping only attributes that exist in the CountryData interface
 };
 
 const defaultAttributes: Array<keyof CountryData> = [
@@ -32,21 +67,49 @@ const defaultAttributes: Array<keyof CountryData> = [
   "electricity_capacity_per_capita",
   "internet_users_per_100",
   "co2_per_capita_tonnes",
-  "renewableEnergyPercent",
+  "electricity_access_percent",
 ];
 
 const attributeOptions: Array<keyof CountryData> = [
+  // Basic info
+  "Mean_Temp",
+  "Median_Age",
+  
+  // Economy
+  "Real_GDP_PPP_billion_USD",
   "Real_GDP_per_Capita_USD",
-  "electricity_capacity_per_capita",
-  "internet_users_per_100",
-  "co2_per_capita_tonnes",
-  "renewableEnergyPercent",
+  "Real_GDP_Growth_Rate_percent",
+  "Youth_Unemployment_Rate_percent",
+  
+  // Demographics
+  "Population_Growth_Rate",
+  "Total_Literacy_Rate",
+  
+  // Energy & Infrastructure
   "electricity_access_percent",
   "electricity_capacity_per_capita",
-  "Mean_Temp",
-  "gdpPerCapita",
-  "internetSpeed",
-  "electricityCost",
+  
+  // Connectivity
+  "internet_users_per_100",
+  "broadband_subs_per_100",
+  "mobile_subs_per_100",
+  
+  // Demographics & Geography
+  "population_density",
+  "road_density_per_1000km2",
+  "rail_density_per_1000km2",
+  "airports_per_million",
+  
+  // Environmental
+  "co2_per_capita_tonnes",
+  "co2_per_gdp_tonnes_per_billion",
+  "fossil_intensity_index",
+  
+  // Geography & Environment
+  "water_share",
+  "coastline_per_1000km2",
+  
+  // No Z-score variants in this component
 ];
 
 export const TopCountriesChart = ({

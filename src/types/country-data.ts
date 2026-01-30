@@ -46,6 +46,11 @@ export interface CountryData {
   water_share?: number;
   coastline_per_1000km2?: number;
   
+  // Z-score fields (standardized metrics for better comparability)
+  z_electricity_capacity_per_capita?: number;
+  z_real_gdp_ppp?: number;
+  z_co2_per_capita?: number;
+  
   // Legacy fields for backward compatibility
   renewableEnergyPercent?: number;
   electricityCost?: number;

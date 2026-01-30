@@ -8,7 +8,7 @@ import { ScatterPlotMatrix } from "@/components/dashboard/ScatterPlotMatrix";
 import { IntroTutorial } from "@/components/dashboard/IntroTutorial";
 import { CountryData, FilterState } from "@/types/country-data";
 import { Upload, RotateCcw, Move } from "lucide-react";
-import { fetchCountryData } from "@/lib/supabase-data";
+import { loadCiaFinalData } from "@/lib/cia-finaldata-loader";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -23,12 +23,22 @@ type SectionId = "barchart" | "spider" | "scatter" | "parallel";
 const Index = () => {
   const [filters, setFilters] = useState<FilterState>({
     renewableEnergy: [0, 100],
-    electricityCost: [0, 100],
-    temperature: [-20, 50],
-    gdp: [0, 200000], // Increased max GDP to include more countries
+    electricityCost: [0, 1],
+    temperature: [-50, 50],
+    gdp: [0, 100000],
     internetSpeed: [0, 1000],
     selectedMetric: "renewableEnergyPercent",
     selectedCountries: [],
+  });
+
+  // Item reduction via slice controls
+  const [sliceControls, setSliceControls] = useState({
+    enabled: false,
+    attribute: "Real_GDP_per_Capita_USD" as keyof CountryData,
+    min: 0,
+    max: 100000,
+    appliedMin: 0,
+    appliedMax: 100000,
   });
 
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
@@ -36,6 +46,19 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
   const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
+  // Brush and linking settings
+  const [brushConfig, setBrushConfig] = useState({
+    // Which visualizations participate in brushing
+    enabledVisualizations: {
+      barchart: true,
+      scatter: true, 
+      parallel: true
+    },
+    // Brushing mode
+    mode: "select" as "select" | "hover",
+    // Geometric zoom level (only applies to SPLOM)
+    zoomLevel: 1
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { toast } = useToast();
 
@@ -67,21 +90,21 @@ const Index = () => {
     try {
       setLoading(true);
       console.log("🔍 Starting country data load...");
-      const data = await fetchCountryData();
+      const data = await loadCiaFinalData();
       console.log("✅ Country data loaded:", { count: data.length, sample: data.slice(0, 3) });
       setCountryData(data);
 
       if (data.length === 0) {
         toast({
           title: "No data available",
-          description: "No country metrics were found from Supabase or local CSV files.",
+          description: "No country metrics were found in the CIA dataset.",
         });
       }
     } catch (error) {
       console.error("Error loading country data:", error);
       toast({
         title: "Error loading data",
-        description: "Failed to fetch country data from database",
+        description: "Failed to load country data from CSV file",
         variant: "destructive",
       });
     } finally {
@@ -99,15 +122,6 @@ const Index = () => {
       return false;
     }
 
-    // Skip electricity cost filtering for now as it's not in the CSV data
-    // if (
-    //   country.electricityCost !== undefined &&
-    //   (country.electricityCost < filters.electricityCost[0] / 100 ||
-    //     country.electricityCost > filters.electricityCost[1] / 100)
-    // ) {
-    //   return false;
-    // }
-
     if (
       country.Mean_Temp !== undefined &&
       (country.Mean_Temp < filters.temperature[0] ||
@@ -118,7 +132,8 @@ const Index = () => {
 
     if (
       country.Real_GDP_per_Capita_USD !== undefined &&
-      (country.Real_GDP_per_Capita_USD < filters.gdp[0] || country.Real_GDP_per_Capita_USD > filters.gdp[1])
+      (country.Real_GDP_per_Capita_USD < filters.gdp[0] ||
+        country.Real_GDP_per_Capita_USD > filters.gdp[1])
     ) {
       return false;
     }
@@ -131,11 +146,24 @@ const Index = () => {
       return false;
     }
 
+    // Filter by selected countries if any
+    if (
+      filters.selectedCountries.length > 0 &&
+      !filters.selectedCountries.includes(country.countryCode)
+    ) {
+      return false;
+    }
+    
+    // Apply item reduction by slicing on the selected attribute
+    if (sliceControls.enabled && country[sliceControls.attribute] !== undefined) {
+      const value = country[sliceControls.attribute] as number;
+      if (value < sliceControls.appliedMin || value > sliceControls.appliedMax) {
+        return false;
+      }
+    }
+
     return true;
   });
-
-  console.log("🔍 Filter data:", { total: countryData.length, filtered: filteredData.length, filters });
-
 
   const handleSpiderCountrySelect = (
     country: CountryData,
@@ -180,13 +208,135 @@ const Index = () => {
       <IntroTutorial />
       <CollapsibleFilterPanel
         filters={filters}
-        onFilterChange={setFilters}
+        onFiltersChange={setFilters}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         countryData={countryData}
-        highlightedCountries={highlightedCountries}
         onHighlightedCountriesChange={setHighlightedCountries}
-        isOpen={isSidebarOpen}
-        onToggle={setIsSidebarOpen}
-      />
+        highlightedCountries={highlightedCountries}
+      >
+        {/* Item reduction by slicing/cutting */}
+        <div className="border rounded-md p-4 mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Item Reduction</h3>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs">Enable Slicing</span>
+              <input
+                type="checkbox"
+                checked={sliceControls.enabled}
+                onChange={(e) => setSliceControls(prev => ({
+                  ...prev,
+                  enabled: e.target.checked
+                }))}
+                className="h-4 w-4"
+              />
+            </div>
+          </div>
+          
+          {sliceControls.enabled && (
+            <>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Attribute</label>
+                <select
+                  className="w-full bg-background border rounded px-2 py-1 text-xs"
+                  value={sliceControls.attribute as string}
+                  onChange={(e) => {
+                    const attr = e.target.value as keyof CountryData;
+                    const values = countryData
+                      .map(c => c[attr])
+                      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
+                    
+                    if (values.length > 0) {
+                      const min = Math.min(...values);
+                      const max = Math.max(...values);
+                      setSliceControls(prev => ({
+                        ...prev,
+                        attribute: attr,
+                        min,
+                        max,
+                        appliedMin: min,
+                        appliedMax: max
+                      }));
+                    }
+                  }}
+                >
+                  {/* Economic */}
+                  <optgroup label="Economic">
+                    <option value="Real_GDP_PPP_billion_USD">GDP (PPP)</option>
+                    <option value="Real_GDP_per_Capita_USD">GDP per Capita</option>
+                    <option value="Real_GDP_Growth_Rate_percent">GDP Growth Rate</option>
+                  </optgroup>
+                  
+                  {/* Energy */}
+                  <optgroup label="Energy">
+                    <option value="electricity_access_percent">Electricity Access</option>
+                    <option value="electricity_capacity_per_capita">Electric Capacity</option>
+                  </optgroup>
+                  
+                  {/* Environment */}
+                  <optgroup label="Environment">
+                    <option value="co2_per_capita_tonnes">CO₂ per Capita</option>
+                    <option value="co2_per_gdp_tonnes_per_billion">CO₂ per GDP</option>
+                  </optgroup>
+                  
+                  {/* Connectivity */}
+                  <optgroup label="Connectivity">
+                    <option value="internet_users_per_100">Internet Users</option>
+                    <option value="mobile_subs_per_100">Mobile Subscribers</option>
+                  </optgroup>
+                </select>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Range: {sliceControls.appliedMin.toFixed(0)} - {sliceControls.appliedMax.toFixed(0)}</span>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="range" 
+                    min={sliceControls.min} 
+                    max={sliceControls.max} 
+                    value={sliceControls.appliedMin}
+                    onChange={(e) => setSliceControls(prev => ({
+                      ...prev,
+                      appliedMin: Math.min(Number(e.target.value), prev.appliedMax - 1)
+                    }))}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="range" 
+                    min={sliceControls.min} 
+                    max={sliceControls.max} 
+                    value={sliceControls.appliedMax}
+                    onChange={(e) => setSliceControls(prev => ({
+                      ...prev,
+                      appliedMax: Math.max(Number(e.target.value), prev.appliedMin + 1)
+                    }))}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div className="flex justify-between items-center text-xs">
+                  <button 
+                    onClick={() => setSliceControls(prev => ({
+                      ...prev,
+                      appliedMin: prev.min,
+                      appliedMax: prev.max
+                    }))}
+                    className="bg-primary text-primary-foreground rounded px-2 py-1"
+                  >
+                    Reset Range
+                  </button>
+                  <span>{filteredData.length} / {countryData.length} items</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </CollapsibleFilterPanel>
       <div className={`h-screen flex flex-col bg-background p-2 overflow-hidden transition-all duration-300 ${
         isSidebarOpen ? 'pl-[384px]' : 'pl-2'
       }`}>
@@ -198,6 +348,25 @@ const Index = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-muted/50 rounded-full px-2 py-1">
+              <span className="text-xs font-medium">Brush Mode:</span>
+              <Button 
+                variant={brushConfig.mode === "select" ? "default" : "outline"} 
+                size="sm" 
+                className="h-6 text-xs px-2 rounded-full" 
+                onClick={() => setBrushConfig(prev => ({...prev, mode: "select"}))}
+              >
+                Select
+              </Button>
+              <Button 
+                variant={brushConfig.mode === "hover" ? "default" : "outline"} 
+                size="sm" 
+                className="h-6 text-xs px-2 rounded-full" 
+                onClick={() => setBrushConfig(prev => ({...prev, mode: "hover"}))}
+              >
+                Hover
+              </Button>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -248,6 +417,8 @@ const Index = () => {
                       onCountrySelect={handleChartCountrySelect}
                       highlightedCountries={highlightedCountries}
                       onBrushSelection={setHighlightedCountries}
+                      brushEnabled={brushConfig.enabledVisualizations.barchart}
+                      brushMode={brushConfig.mode}
                     />
                   </div>
                 </ResizablePanel>
@@ -288,6 +459,10 @@ const Index = () => {
                       onCountrySelect={handleChartCountrySelect}
                       highlightedCountries={highlightedCountries}
                       onBrushSelection={setHighlightedCountries}
+                      brushEnabled={brushConfig.enabledVisualizations.scatter}
+                      brushMode={brushConfig.mode}
+                      zoomLevel={brushConfig.zoomLevel}
+                      onZoomChange={(level) => setBrushConfig(prev => ({...prev, zoomLevel: level}))}
                     />
                   </div>
                 </ResizablePanel>
@@ -304,6 +479,8 @@ const Index = () => {
                       onCountrySelect={handleChartCountrySelect}
                       highlightedCountries={highlightedCountries}
                       onMultiSelect={setHighlightedCountries}
+                      brushEnabled={brushConfig.enabledVisualizations.parallel}
+                      brushMode={brushConfig.mode}
                     />
                   </div>
                 </ResizablePanel>

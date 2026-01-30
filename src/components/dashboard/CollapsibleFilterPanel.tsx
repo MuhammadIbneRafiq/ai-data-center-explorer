@@ -19,22 +19,24 @@ import {
 
 interface CollapsibleFilterPanelProps {
   filters: FilterState;
-  onFilterChange: (filters: FilterState) => void;
+  onFiltersChange: (filters: FilterState) => void;
   countryData: CountryData[];
   highlightedCountries?: Set<string>;
   onHighlightedCountriesChange?: (countries: Set<string>) => void;
   isOpen?: boolean;
   onToggle?: (open: boolean) => void;
+  children?: React.ReactNode;
 }
 
 export const CollapsibleFilterPanel = ({
   filters,
-  onFilterChange,
+  onFiltersChange,
   countryData,
   highlightedCountries,
   onHighlightedCountriesChange,
   isOpen: externalIsOpen,
   onToggle,
+  children
 }: CollapsibleFilterPanelProps) => {
   const [internalIsOpen, setInternalIsOpen] = useState(true);
   
@@ -109,7 +111,7 @@ export const CollapsibleFilterPanel = ({
   }, [countryData]);
 
   const resetFilters = () => {
-    onFilterChange({
+    onFiltersChange({
       renewableEnergy: [0, 100],
       electricityCost: [0, 100],
       temperature: [-20, 50],
@@ -200,6 +202,9 @@ export const CollapsibleFilterPanel = ({
 
         <ScrollArea className="h-[calc(100vh-140px)]">
           <div className="p-4 space-y-6">
+            {/* Render custom children components */}
+            {children && <div className="mb-4">{children}</div>}
+            
             {activeTab === "range" ? (
               <>
                 <div className="space-y-3">
@@ -228,7 +233,7 @@ export const CollapsibleFilterPanel = ({
                   <Slider
                     value={filters.renewableEnergy}
                     onValueChange={(value) =>
-                      onFilterChange({ ...filters, renewableEnergy: value as [number, number] })
+                      onFiltersChange({ ...filters, renewableEnergy: value as [number, number] })
                     }
                     min={0}
                     max={100}
@@ -263,7 +268,7 @@ export const CollapsibleFilterPanel = ({
                   <Slider
                     value={filters.electricityCost}
                     onValueChange={(value) =>
-                      onFilterChange({ ...filters, electricityCost: value as [number, number] })
+                      onFiltersChange({ ...filters, electricityCost: value as [number, number] })
                     }
                     min={0}
                     max={100}
@@ -298,7 +303,7 @@ export const CollapsibleFilterPanel = ({
                   <Slider
                     value={filters.temperature}
                     onValueChange={(value) =>
-                      onFilterChange({ ...filters, temperature: value as [number, number] })
+                      onFiltersChange({ ...filters, temperature: value as [number, number] })
                     }
                     min={-20}
                     max={50}
@@ -333,7 +338,7 @@ export const CollapsibleFilterPanel = ({
                   <Slider
                     value={filters.gdp}
                     onValueChange={(value) =>
-                      onFilterChange({ ...filters, gdp: value as [number, number] })
+                      onFiltersChange({ ...filters, gdp: value as [number, number] })
                     }
                     min={0}
                     max={200000}
@@ -368,7 +373,7 @@ export const CollapsibleFilterPanel = ({
                   <Slider
                     value={filters.internetSpeed}
                     onValueChange={(value) =>
-                      onFilterChange({ ...filters, internetSpeed: value as [number, number] })
+                      onFiltersChange({ ...filters, internetSpeed: value as [number, number] })
                     }
                     min={0}
                     max={1000}
@@ -391,7 +396,7 @@ export const CollapsibleFilterPanel = ({
                         variant={filters.selectedMetric === metric.value ? "default" : "outline"}
                         size="sm"
                         onClick={() =>
-                          onFilterChange({ ...filters, selectedMetric: metric.value })
+                          onFiltersChange({ ...filters, selectedMetric: metric.value })
                         }
                       >
                         {metric.label}
