@@ -10,10 +10,10 @@ An interactive data visualization tool for exploring global AI data center locat
 
 ### Installation
 
-1. **Clone the repository**
+1. **Clone the repository or unzip the folder and navigate to it**
    ```bash
-   git clone <repository-url>
-   cd visualization-13/ai-data-center-explorer
+   git clone https://github.com/MuhammadIbneRafiq/ai-data-center-explorer
+   cd ai-data-center-explorer
    ```
 
 2. **Install dependencies**
@@ -47,7 +47,6 @@ We leveraged **Lovable** and **Windsurf** for rapid framework scaffolding and bo
 ## 📊 Features
 
 ### Core Visualizations
-- **Interactive World Map**: GeoJSON-based country visualization with dynamic coloring
 - **Parallel Coordinates Plot**: Multi-dimensional data analysis with attribute selection
 - **3D Scatter Plot**: Three-dimensional data exploration with bubble sizing
 - **Bar Charts**: Country comparisons across various metrics
@@ -82,12 +81,10 @@ We leveraged **Lovable** and **Windsurf** for rapid framework scaffolding and bo
 - **Recharts** - Chart library for React
 - **Leaflet** - Interactive maps
 - **React Leaflet** - React integration for Leaflet
-- **D3.js** (indirect) - Data-driven visualizations
 
 ### Data Handling
 - **Papa Parse** - CSV parsing library
 - **React Query** - Data fetching and caching
-- **Supabase Client** - Database integration (optional)
 
 ## 📁 Project Structure
 
@@ -131,8 +128,8 @@ ai-data-center-explorer/
 
 ## 🔧 Configuration
 
-### Environment Variables
-Create a `.env` file with:
+### Environment Variables(optional)
+Create a `.env` file with if you'd like to enhance data loading by replacing blatant csv file reading to supabase loading data from a bucket:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -197,24 +194,6 @@ The application supports 20+ attributes across categories:
 - Large datasets may take time to load initially
 - Use filtering to improve performance with many countries
 - Close unused browser tabs for better performance
-
-## 🤝 Contributing
-
-### Development Setup
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Make changes and test thoroughly
-4. Commit changes: `git commit -m 'Add feature'`
-5. Push to branch: `git push origin feature-name`
-6. Submit pull request
-
-### Code Style
-- Use TypeScript for all new code
-- Follow existing component patterns
-- Add comments for complex logic
-- Use Tailwind for styling
-
-## 📚 Documentation
 
 # Implementation Details
 
@@ -386,106 +365,6 @@ This section provides a comprehensive breakdown of what was implemented from scr
 ### Geographic Data
 - **Source**: GeoJSON country boundaries (external) - **External data**
 - **Integration**: Custom processing and rendering
-
-## 🎨 UI/UX Design (Custom)
-
-### Design System
-- **Glass-morphism effects** - **100% Custom CSS**
-- **Dark theme implementation** - **100% Custom**
-- **Responsive layout design** - **100% Custom**
-- **Animation and transitions** - **100% Custom**
-- **Color scheme and accessibility** - **100% Custom**
-
-### User Experience
-- **Interactive tutorial flow** - **100% Custom design**
-- **Cross-visualization interaction patterns** - **100% Custom**
-- **Filter and selection paradigms** - **100% Custom**
-
-## 📈 Complexity Assessment
-
-### Overall Implementation Complexity: **HIGH**
-
-#### Reasons for High Complexity Rating:
-
-1. **Multi-Visualization Integration**
-   - Synchronized state across 5+ different visualization types
-   - Complex event handling and propagation
-   - Performance optimization for real-time updates
-
-2. **Data Processing Pipeline**
-   - Custom CSV parsing with 50+ attributes
-   - Coordinate mapping for 200+ countries
-   - Data validation and error handling
-   - Multiple data source integration
-
-3. **Advanced Interactions**
-   - Cross-visualization highlighting
-   - Click-to-focus with automatic zoom
-   - Dynamic attribute selection
-   - Multi-dimensional data exploration
-
-4. **Custom Visualization Components**
-   - Parallel coordinates plot from scratch
-   - 3D scatter plot implementation
-   - GeoJSON map integration
-   - Interactive tutorial system
-
-## 📚 Library Usage Breakdown
-
-### Heavily Modified Libraries (30%+ custom code):
-- **Recharts** - Custom configurations and data transformations
-- **Leaflet** - Custom interaction layers and event handling
-- **React Query** - Custom data loading strategies
-
-### Lightly Used Libraries (minimal modification):
-- **Tailwind CSS** - Used as-is for styling
-- **Radix UI** - Used components with minimal customization
-- **Papa Parse** - Used as-is for CSV parsing
-
-### Infrastructure Libraries (no modification):
-- **React, TypeScript, Vite** - Used as development platform
-- **ESLint, PostCSS** - Development tooling
-
-## 🎓 Learning Outcomes
-
-### Skills Demonstrated:
-1. **Full-stack development** - Frontend, data processing, deployment
-2. **Data visualization** - Multiple chart types and interactions
-3. **State management** - Complex cross-component state
-4. **API integration** - Multiple data sources and fallbacks
-5. **UI/UX design** - Custom design system implementation
-6. **Performance optimization** - Large dataset handling
-
-### Technical Challenges Overcome:
-1. **Data Integration** - Merging multiple data sources
-2. **Performance** - Rendering 200+ countries smoothly
-3. **Interactivity** - Cross-visualization synchronization
-4. **Responsive Design** - Working on multiple screen sizes
-5. **Type Safety** - Comprehensive TypeScript implementation
-
-## 📄 Attribution Summary
-
-### External Libraries Used:
-- **React ecosystem** (React, TypeScript, Vite) - MIT licenses
-- **shadcn/ui & Radix UI** - MIT licenses  
-- **Recharts** - MIT license
-- **Leaflet** - BSD 2-Clause license
-- **Papa Parse** - MIT license
-- **Tailwind CSS** - MIT license
-
-### External Data Sources:
-- **CIA World Factbook** - Public domain data
-- **GeoJSON country boundaries** - Various open sources
-- **Country coordinates** - Manual compilation from public sources
-
-### Custom Implementation Summary:
-- **~70% of application code** is custom implementation
-- **~30% is library integration and configuration**
-- **100% of data processing logic** is custom
-- **100% of interaction design** is custom
-- **100% of visualization task implementation** is custom
-
----
 
 ## 🙏 Acknowledgments
 
