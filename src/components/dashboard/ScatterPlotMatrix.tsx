@@ -189,15 +189,17 @@ export const ScatterPlotMatrix = ({
   };
   
   const getPointColor = (countryCode: string) => {
+    const blue = "#3b82f6"; // explicit blue
+    const blueMuted = "#3b82f6" + "33"; // 20% opacity
     if (activeCountry && activeCountry.countryCode === countryCode) {
-      return "hsl(var(--chart-3))";
+      return blue;
     }
     if (highlightedCountries && highlightedCountries.size > 0) {
       return highlightedCountries.has(countryCode)
-        ? colorPalette[getColorIndex(countryCode)]
-        : "hsl(var(--muted-foreground) / 0.2)";
+        ? blue
+        : blueMuted;
     }
-    return "hsl(var(--chart-2))";
+    return blue;
   };
 
   const handlePointClick = (country: CountryData) => {
@@ -551,7 +553,8 @@ export const ScatterPlotMatrix = ({
                              (useLogScales && getAttributeConfig(yAttr).useLogScale ? ' (log10)' : ''),
                       angle: -90,
                       position: "left",
-                      dx: 40,
+                      dx: 35,
+                      dy: -30,
                       fontSize: 9,
                       fill: "hsl(var(--foreground))",
                     } : undefined}
@@ -581,6 +584,8 @@ export const ScatterPlotMatrix = ({
                   />
                   <Scatter
                     data={scatterData}
+                    fill="#3b82f6"
+                    stroke="#3b82f6"
                     onClick={(data) => {
                       const entry = data as typeof scatterData[0];
                       if (entry?.country) handlePointClick(entry.country);
@@ -588,7 +593,7 @@ export const ScatterPlotMatrix = ({
                   >
                     {scatterData.map((entry) => {
                       // Base radius depends on matrix size - smaller for larger matrices
-                      const baseR = matrixSize === "3x3" ? 3 : matrixSize === "2x2" ? 4 : 2;
+                      const baseR = matrixSize === "3x3" ? 0.9 : matrixSize === "2x2" ? 1.4 : 0.9;
                       const isHovered = hoveredCountry === entry.country.countryCode;
                       const isHighlighted = highlightedCountries?.has(entry.country.countryCode);
                       
@@ -597,7 +602,7 @@ export const ScatterPlotMatrix = ({
                       // - Labels for highlighted or hovered points
                       // - Stroke outlines 
                       const zoomedCell = isZoomed || cellScale > 1;
-                      const semanticR = zoomedCell ? baseR * 1.5 : baseR;
+                      const semanticR = zoomedCell ? baseR * 1.1 : baseR;
                       
                       return (
                         <g key={entry.country.countryCode}>
@@ -607,12 +612,11 @@ export const ScatterPlotMatrix = ({
                             style={{
                               cursor: isBrushingEnabled ? "crosshair" : "pointer",
                               opacity: hoveredCountry && !isHovered ? 0.55 : 1,
-                              filter: isHovered ? "drop-shadow(0 0 6px hsla(var(--primary),0.6))" : 
-                                    (zoomedCell && isHighlighted) ? "drop-shadow(0 0 4px hsla(var(--primary),0.4))" : "none",
-                              stroke: zoomedCell && isHighlighted ? "hsl(var(--primary))" : "none",
-                              strokeWidth: zoomedCell && isHighlighted ? 1 : 0,
+                              filter: "none",
+                              stroke: "none",
+                              strokeWidth: 0,
                             }}
-                            r={isHovered ? semanticR * 1.8 : semanticR}
+                            r={isHovered ? semanticR * 1.05 : semanticR}
                           />
                           
                           {/* Show labels when zoomed in and point is highlighted or hovered */}
@@ -690,6 +694,8 @@ export const ScatterPlotMatrix = ({
             />
             <Scatter
               data={scatterData}
+              fill="#3b82f6"
+              stroke="#3b82f6"
               onClick={(data) => {
                 if (!isBrushingEnabled) {
                   const entry = data as typeof scatterData[0];
@@ -707,7 +713,7 @@ export const ScatterPlotMatrix = ({
                       cursor: isBrushingEnabled ? "crosshair" : "pointer",
                       opacity: hoveredCountry && !isHovered ? 0.55 : 1,
                     }}
-                    r={isHovered ? 6 : 4}
+                    r={isHovered ? 2.2 : 1.8}
                   />
                 );
               })}
