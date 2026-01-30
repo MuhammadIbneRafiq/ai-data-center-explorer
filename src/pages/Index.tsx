@@ -31,15 +31,15 @@ const Index = () => {
     selectedCountries: [],
   });
 
-  // Item reduction via slice controls
-  const [sliceControls, setSliceControls] = useState({
-    enabled: false,
-    attribute: "Real_GDP_per_Capita_USD" as keyof CountryData,
-    min: 0,
-    max: 100000,
-    appliedMin: 0,
-    appliedMax: 100000,
-  });
+  // Item reduction/slicing removed - using normal filters instead
+  // const [sliceControls, setSliceControls] = useState({
+  //   enabled: false,
+  //   attribute: "Real_GDP_per_Capita_USD" as keyof CountryData,
+  //   min: 0,
+  //   max: 100000,
+  //   appliedMin: 0,
+  //   appliedMax: 100000,
+  // });
 
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
   const [countryData, setCountryData] = useState<CountryData[]>([]);
@@ -170,16 +170,16 @@ const Index = () => {
       return false;
     }
     
-    // Apply item reduction by slicing on the selected attribute
-    if (sliceControls.enabled && country[sliceControls.attribute] !== undefined) {
-      const value = country[sliceControls.attribute] as number;
-      if (value < sliceControls.appliedMin || value > sliceControls.appliedMax) {
-        return false;
-      }
-    }
+    // Item reduction/slicing removed - using normal filters instead
+    // if (sliceControls.enabled && country[sliceControls.attribute] !== undefined) {
+    //   const value = country[sliceControls.attribute] as number;
+    //   if (value < sliceControls.appliedMin || value > sliceControls.appliedMax) {
+    //     return false;
+    //   }
+    // }
 
     return true;
-  }), [countryData, filters, sliceControls]);
+  }), [countryData, filters]);
 
   const handleSpiderCountrySelect = (
     country: CountryData,
@@ -230,130 +230,8 @@ const Index = () => {
         highlightedCountries={highlightedCountries}
         isOpen={isSidebarOpen}
         onToggle={setIsSidebarOpen}
-      >
-        {/* Item reduction by slicing/cutting */}
-        <div className="border rounded-md p-4 mt-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Item Reduction</h3>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs">Enable Slicing</span>
-              <input
-                type="checkbox"
-                checked={sliceControls.enabled}
-                onChange={(e) => setSliceControls(prev => ({
-                  ...prev,
-                  enabled: e.target.checked
-                }))}
-                className="h-4 w-4"
-              />
-            </div>
-          </div>
-          
-          {sliceControls.enabled && (
-            <>
-              <div className="space-y-2">
-                <label className="text-xs font-medium">Attribute</label>
-                <select
-                  className="w-full bg-background border rounded px-2 py-1 text-xs"
-                  value={sliceControls.attribute as string}
-                  onChange={(e) => {
-                    const attr = e.target.value as keyof CountryData;
-                    const values = countryData
-                      .map(c => c[attr])
-                      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
-                    
-                    if (values.length > 0) {
-                      const min = Math.min(...values);
-                      const max = Math.max(...values);
-                      setSliceControls(prev => ({
-                        ...prev,
-                        attribute: attr,
-                        min,
-                        max,
-                        appliedMin: min,
-                        appliedMax: max
-                      }));
-                    }
-                  }}
-                >
-                  {/* Economic */}
-                  <optgroup label="Economic">
-                    <option value="Real_GDP_PPP_billion_USD">GDP (PPP)</option>
-                    <option value="Real_GDP_per_Capita_USD">GDP per Capita</option>
-                    <option value="Real_GDP_Growth_Rate_percent">GDP Growth Rate</option>
-                  </optgroup>
-                  
-                  {/* Energy */}
-                  <optgroup label="Energy">
-                    <option value="electricity_access_percent">Electricity Access</option>
-                    <option value="electricity_capacity_per_capita">Electric Capacity</option>
-                  </optgroup>
-                  
-                  {/* Environment */}
-                  <optgroup label="Environment">
-                    <option value="co2_per_capita_tonnes">CO₂ per Capita</option>
-                    <option value="co2_per_gdp_tonnes_per_billion">CO₂ per GDP</option>
-                  </optgroup>
-                  
-                  {/* Connectivity */}
-                  <optgroup label="Connectivity">
-                    <option value="internet_users_per_100">Internet Users</option>
-                    <option value="mobile_subs_per_100">Mobile Subscribers</option>
-                  </optgroup>
-                </select>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span>Range: {sliceControls.appliedMin.toFixed(0)} - {sliceControls.appliedMax.toFixed(0)}</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="range" 
-                    min={sliceControls.min} 
-                    max={sliceControls.max} 
-                    value={sliceControls.appliedMin}
-                    onChange={(e) => setSliceControls(prev => ({
-                      ...prev,
-                      appliedMin: Math.min(Number(e.target.value), prev.appliedMax - 1)
-                    }))}
-                    className="w-full"
-                  />
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="range" 
-                    min={sliceControls.min} 
-                    max={sliceControls.max} 
-                    value={sliceControls.appliedMax}
-                    onChange={(e) => setSliceControls(prev => ({
-                      ...prev,
-                      appliedMax: Math.max(Number(e.target.value), prev.appliedMin + 1)
-                    }))}
-                    className="w-full"
-                  />
-                </div>
-                
-                <div className="flex justify-between items-center text-xs">
-                  <button 
-                    onClick={() => setSliceControls(prev => ({
-                      ...prev,
-                      appliedMin: prev.min,
-                      appliedMax: prev.max
-                    }))}
-                    className="bg-primary text-primary-foreground rounded px-2 py-1"
-                  >
-                    Reset Range
-                  </button>
-                  <span>{filteredData.length} / {countryData.length} items</span>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </CollapsibleFilterPanel>
+      />
+      {/* Item reduction/slicing section removed - using normal filters instead */}
       <div className={`h-screen flex flex-col bg-background p-2 overflow-hidden transition-all duration-300 ${
         isSidebarOpen ? 'pl-[384px]' : 'pl-2'
       }`}>
