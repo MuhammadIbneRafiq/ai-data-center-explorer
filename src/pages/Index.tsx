@@ -387,7 +387,7 @@ const Index = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-muted/50 rounded-full px-2 py-1">
+            {/* <div className="flex items-center gap-1 bg-muted/50 rounded-full px-2 py-1">
               <span className="text-xs font-medium">Brush Mode:</span>
               <Button 
                 variant={brushConfig.mode === "select" ? "default" : "outline"} 
@@ -405,7 +405,7 @@ const Index = () => {
               >
                 Hover
               </Button>
-            </div>
+            </div> */}
             <Button
               variant="outline"
               size="sm"

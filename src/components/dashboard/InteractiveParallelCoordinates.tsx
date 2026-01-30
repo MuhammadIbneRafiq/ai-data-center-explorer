@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, MousePointer2, Maximize2, Search, GitBranch, Focus } from "lucide-react";
+import { X, Maximize2, Focus, Link2, Unlink, LayoutList, LayoutGrid, ArrowLeftRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface InteractiveParallelCoordinatesProps {
@@ -22,6 +23,14 @@ interface Attribute {
   label: string;
   category: string;
 }
+
+interface AxisLink {
+  id: string;
+  sourceAxis: string;
+  targetAxis: string;
+}
+
+type ViewMode = "standard" | "flexible" | "radial";
 
 const availableAttributes: Attribute[] = [
   // Economic
@@ -89,8 +98,16 @@ export const InteractiveParallelCoordinates = ({
   const [localBrushMode, setLocalBrushMode] = useState<"select" | "hover">(brushMode);
   const [focusMode, setFocusMode] = useState(false);
   
-  // PCP variant: standard or flexible (radial)
-  const [pcpVariant, setPcpVariant] = useState<'standard' | 'flexible'>('standard');
+  // View mode: standard, flexible (linked axes), or radial
+  const [viewMode, setViewMode] = useState<ViewMode>('standard');
+  
+  // Flexible linked axes state
+  const [axisLinks, setAxisLinks] = useState<AxisLink[]>([]);
+  const [linkingMode, setLinkingMode] = useState(false);
+  const [selectedAxisForLink, setSelectedAxisForLink] = useState<string | null>(null);
+  
+  // Central axis for flexible linked view (Claessen paper style)
+  const [centralAxisKey, setCentralAxisKey] = useState<string>(selectedAttributes[0]?.key || '');
   
   // Flexible axis scaling - for distorted zooming on specific axes
   const [axisScales, setAxisScales] = useState<Record<string, number>>({});
@@ -235,6 +252,66 @@ export const InteractiveParallelCoordinates = ({
     onMultiSelect?.(new Set());
   }, [onMultiSelect]);
 
+  // Handle axis click for swapping or linking
+  const handleAxisClick = useCallback((attrKey: string, index: number) => {
+    if (linkingMode) {
+      if (selectedAxisForLink === null) {
+        setSelectedAxisForLink(attrKey);
+      } else if (selectedAxisForLink !== attrKey) {
+        // Create new link
+        const newLink: AxisLink = {
+          id: `${selectedAxisForLink}-${attrKey}`,
+          sourceAxis: selectedAxisForLink,
+          targetAxis: attrKey,
+        };
+        // Don't add duplicate links
+        if (!axisLinks.some(l => 
+          (l.sourceAxis === newLink.sourceAxis && l.targetAxis === newLink.targetAxis) ||
+          (l.sourceAxis === newLink.targetAxis && l.targetAxis === newLink.sourceAxis)
+        )) {
+          setAxisLinks([...axisLinks, newLink]);
+        }
+        setSelectedAxisForLink(null);
+      }
+    } else {
+      // Swap with next axis (standard PCP behavior)
+      if (index < selectedAttributes.length - 1) {
+        const newAttrs = [...selectedAttributes];
+        [newAttrs[index], newAttrs[index + 1]] = [newAttrs[index + 1], newAttrs[index]];
+        setSelectedAttributes(newAttrs);
+      }
+    }
+  }, [linkingMode, selectedAxisForLink, axisLinks, selectedAttributes]);
+
+  // Remove a link
+  const removeLink = useCallback((linkId: string) => {
+    setAxisLinks(axisLinks.filter(l => l.id !== linkId));
+  }, [axisLinks]);
+
+  // Generate flexible link path between two non-adjacent axes
+  const generateLinkPath = useCallback((
+    normalized: Record<string, number>,
+    sourceKey: string,
+    targetKey: string,
+    axisPositions: number[],
+    height: number
+  ) => {
+    const sourceIdx = selectedAttributes.findIndex(a => a.key === sourceKey);
+    const targetIdx = selectedAttributes.findIndex(a => a.key === targetKey);
+    if (sourceIdx === -1 || targetIdx === -1) return "";
+
+    const sourceX = axisPositions[sourceIdx];
+    const targetX = axisPositions[targetIdx];
+    const sourceY = height * (1 - normalized[sourceKey]);
+    const targetY = height * (1 - normalized[targetKey]);
+
+    // Create a curved path for non-adjacent connections
+    const midX = (sourceX + targetX) / 2;
+    const curveOffset = Math.abs(targetIdx - sourceIdx) * 25;
+    
+    return `M ${sourceX},${sourceY} Q ${midX},${sourceY - curveOffset} ${targetX},${targetY}`;
+  }, [selectedAttributes]);
+
   const margin = { top: 60, right: 40, bottom: 40, left: 40 };
   const width = dimensions.width - margin.left - margin.right;
   const height = dimensions.height - margin.top - margin.bottom;
@@ -346,45 +423,93 @@ export const InteractiveParallelCoordinates = ({
     }
   }, [isDraggingAxis, handleAxisMouseMove, handleAxisMouseUp]);
   
-  const generatePath = (normalized: Record<string, number>) => {
-    if (pcpVariant === 'flexible') {
-      // Generate curved path for flexible/radial layout
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const radius = Math.min(width, height) * 0.35;
-      const angleStep = (2 * Math.PI) / selectedAttributes.length;
+  // Claessen paper: Flexible Linked Axes layout
+  // Central axis in middle, peripheral axes arranged around it with mini-PCPs
+  const getFlexibleLinkedLayout = (w: number, h: number) => {
+    const centerX = w / 2;
+    const centerY = h / 2;
+    const centralAxisLength = Math.min(w, h) * 0.18; // Slightly larger central axis
+    const radius = Math.min(w, h) * 0.42; // Increased distance to fill more space
+    const peripheralAxisLength = Math.min(w, h) * 0.16; // Longer peripheral axes
+    
+    // Get peripheral axes (all except the central one)
+    const centralAttr = selectedAttributes.find(a => a.key === centralAxisKey) || selectedAttributes[0];
+    const peripheralAttrs = selectedAttributes.filter(a => a.key !== centralAxisKey);
+    const numPeripheral = peripheralAttrs.length;
+    
+    // Calculate positions for peripheral axes arranged in a circle
+    const peripheralPositions = peripheralAttrs.map((attr, i) => {
+      const angle = (i * 2 * Math.PI) / numPeripheral - Math.PI / 2;
+      const cx = centerX + radius * Math.cos(angle);
+      const cy = centerY + radius * Math.sin(angle);
       
-      const points = selectedAttributes.map((attr, i) => {
-        const angle = i * angleStep - Math.PI / 2;
-        const value = normalized[attr.key];
-        const r = radius * (0.2 + 0.8 * value);
-        const x = centerX + r * Math.cos(angle);
-        const y = centerY + r * Math.sin(angle);
-        return { x, y };
-      });
-      
-      // Create smooth curve through points
-      let path = `M ${points[0].x},${points[0].y}`;
-      for (let i = 0; i < points.length; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % points.length];
-        const cp1x = p1.x + (p2.x - p1.x) * 0.3;
-        const cp1y = p1.y + (p2.y - p1.y) * 0.3;
-        const cp2x = p2.x - (p2.x - p1.x) * 0.3;
-        const cp2y = p2.y - (p2.y - p1.y) * 0.3;
-        path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
-      }
-      return path;
-    } else {
-      // Standard parallel coordinates path
-      const points = selectedAttributes.map((attr, i) => {
-        const x = axisPositions[i];
-        const y = height * (1 - normalized[attr.key]);
-        return `${x},${y}`;
-      });
-      return `M ${points.join(' L ')}`;
-    }
+      // Peripheral axis is perpendicular to the line from center
+      const perpAngle = angle + Math.PI / 2;
+      return {
+        attr,
+        centerX: cx,
+        centerY: cy,
+        startX: cx - peripheralAxisLength * Math.cos(perpAngle) / 2,
+        startY: cy - peripheralAxisLength * Math.sin(perpAngle) / 2,
+        endX: cx + peripheralAxisLength * Math.cos(perpAngle) / 2,
+        endY: cy + peripheralAxisLength * Math.sin(perpAngle) / 2,
+        angle,
+        // Mini-PCP connection points to center
+        toCenterAngle: angle + Math.PI, // Points back to center
+      };
+    });
+    
+    return {
+      centerX,
+      centerY,
+      centralAxisLength,
+      centralAttr,
+      peripheralPositions,
+    };
   };
+
+  // Get position on a peripheral axis based on normalized value
+  const getPeripheralPointPosition = (peripheral: any, value: number) => {
+    const t = value; // 0 to 1
+    return {
+      x: peripheral.startX + (peripheral.endX - peripheral.startX) * t,
+      y: peripheral.startY + (peripheral.endY - peripheral.startY) * t,
+    };
+  };
+
+  // Get position on central axis based on normalized value  
+  const getCentralPointPosition = (centerX: number, centerY: number, axisLength: number, value: number, angle: number) => {
+    // Central axis points toward the peripheral axis
+    const t = value; // 0 to 1
+    const halfLen = axisLength / 2;
+    // Axis runs perpendicular to the angle to center
+    const perpAngle = angle + Math.PI / 2;
+    const startX = centerX - halfLen * Math.cos(perpAngle);
+    const startY = centerY - halfLen * Math.sin(perpAngle);
+    const endX = centerX + halfLen * Math.cos(perpAngle);
+    const endY = centerY + halfLen * Math.sin(perpAngle);
+    return {
+      x: startX + (endX - startX) * t,
+      y: startY + (endY - startY) * t,
+    };
+  };
+
+  const generatePath = (normalized: Record<string, number>, axisPos: number[], h: number, w: number, mode: ViewMode) => {
+    // Standard parallel coordinates path only (radial uses different rendering)
+    const points = selectedAttributes.map((attr, i) => {
+      const x = axisPos[i];
+      const y = h * (1 - normalized[attr.key]);
+      return `${x},${y}`;
+    });
+    return `M ${points.join(' L ')}`;
+  };
+  
+  // Click handler for moving axis to center in radial view
+  const handleAxisToCenter = useCallback((attrKey: string) => {
+    if (viewMode === 'radial') {
+      setCentralAxisKey(attrKey);
+    }
+  }, [viewMode]);
 
   // Apply fisheye distortion to coordinates
   const applyFisheye = (x: number, y: number) => {
@@ -407,29 +532,30 @@ export const InteractiveParallelCoordinates = ({
   
   const parallelContent = (fullscreen = false) => {
     // Calculate dimensions based on whether we're in fullscreen
-  const contentDimensions = fullscreen 
-    ? { width: window.innerWidth * 0.95, height: window.innerHeight * 0.85 }
-    : dimensions;
+    const contentDimensions = fullscreen 
+      ? { width: window.innerWidth * 0.95, height: window.innerHeight * 0.85 }
+      : dimensions;
 
-  // Recalculate layout dimensions for this content
-  const margin = { top: 60, right: 40, bottom: 40, left: 40 };
-  const width = contentDimensions.width - margin.left - margin.right;
-  const height = contentDimensions.height - margin.top - margin.bottom;
-  
-  // Calculate axis positions with flexible scaling
-  let totalScale = selectedAttributes.reduce((sum, attr) => 
-    sum + (axisScales[attr.key] || 1), 0);
-  
-  if (totalScale === 0) totalScale = selectedAttributes.length;
-  
-  const baseSpacing = width / totalScale;
-  let currentPosition = 0;
-  const axisPositions = selectedAttributes.map(attr => {
-    const scale = axisScales[attr.key] || 1;
-    const position = currentPosition;
-    currentPosition += baseSpacing * scale;
-    return position;
-  });
+    // Recalculate layout dimensions for this content
+    // Reduced margins to fill more space
+    const margin = { top: 40, right: 20, bottom: 20, left: 20 };
+    const width = contentDimensions.width - margin.left - margin.right;
+    const height = contentDimensions.height - margin.top - margin.bottom;
+    
+    // Calculate axis positions with flexible scaling
+    let totalScale = selectedAttributes.reduce((sum, attr) => 
+      sum + (axisScales[attr.key] || 1), 0);
+    
+    if (totalScale === 0) totalScale = selectedAttributes.length;
+    
+    const baseSpacing = width / (totalScale - 1 || 1);
+    let currentPosition = 0;
+    const axisPositions = selectedAttributes.map((attr, idx) => {
+      if (idx === 0) return 0;
+      const scale = axisScales[selectedAttributes[idx - 1].key] || 1;
+      currentPosition += baseSpacing * scale;
+      return currentPosition;
+    });
 
     return (
       <div className={`relative w-full ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
@@ -456,82 +582,211 @@ export const InteractiveParallelCoordinates = ({
           }}
         >
           <g transform={`translate(${margin.left}, ${margin.top})`}>
-            {/* Draw axes */}
-            {selectedAttributes.map((attr, i) => {
+            {/* Draw axes - Standard/Flexible mode */}
+            {viewMode !== 'radial' && selectedAttributes.map((attr, i) => {
               const x = axisPositions[i];
               const scale = axisScales[attr.key] || 1;
+              const isLinkSource = selectedAxisForLink === attr.key;
               
               return (
                 <g key={attr.key}>
-                  {/* Axis line - thicker when emphasized */}
+                  {/* Axis line */}
                   <line
                     x1={x}
                     y1={0}
                     x2={x}
                     y2={height}
-                    stroke={isDraggingAxis === attr.key ? "hsl(var(--primary))" : "hsl(var(--border))"}
-                    strokeWidth={scale > 1.2 ? 3 : 2}
-                    style={{ cursor: "ns-resize" }}
-                    onMouseDown={(e) => handleAxisMouseDown(attr.key, e)}
+                    stroke={isLinkSource ? "hsl(var(--primary))" : isDraggingAxis === attr.key ? "hsl(var(--chart-3))" : "hsl(var(--border))"}
+                    strokeWidth={isLinkSource ? 4 : scale > 1.2 ? 3 : 2}
+                    style={{ cursor: linkingMode ? "pointer" : "ns-resize" }}
+                    onMouseDown={(e) => !linkingMode && handleAxisMouseDown(attr.key, e)}
+                    onClick={() => handleAxisClick(attr.key, i)}
                   />
                   
-                  {/* Axis label - emphasized when scaled */}
+                  {/* Axis label */}
                   <text
                     x={x}
                     y={-10}
                     textAnchor="middle"
-                    fill={scale > 1.2 ? "hsl(var(--primary))" : "hsl(var(--foreground))"}
-                    fontSize={fullscreen ? 14 * Math.sqrt(scale) : 12 * Math.sqrt(scale)}
+                    fill={isLinkSource ? "hsl(var(--primary))" : scale > 1.2 ? "hsl(var(--chart-3))" : "hsl(var(--foreground))"}
+                    fontSize={fullscreen ? 14 * Math.sqrt(scale) : 11 * Math.sqrt(scale)}
                     fontWeight="600"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleAxisClick(attr.key, i)}
                   >
                     {attr.label}
                   </text>
                   
                   {/* Min/Max labels */}
-                  <text
-                    x={x}
-                    y={height + 20}
-                    textAnchor="middle"
-                    fill="hsl(var(--muted-foreground))"
-                    fontSize={fullscreen ? 12 : 10}
-                  >
-                    Min
-                  </text>
-                  <text
-                    x={x}
-                    y={-25}
-                    textAnchor="middle"
-                    fill="hsl(var(--muted-foreground))"
-                    fontSize={fullscreen ? 12 : 10}
-                  >
-                    Max
-                  </text>
+                  <text x={x} y={height + 20} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={fullscreen ? 12 : 10}>Min</text>
+                  <text x={x} y={-25} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={fullscreen ? 12 : 10}>Max</text>
                   
-                  {/* Scale indicator */}
-                  {scale !== 1 && (
-                    <text
-                      x={x}
-                      y={-40}
-                      textAnchor="middle"
-                      fill="hsl(var(--primary))"
-                      fontSize={fullscreen ? 12 : 10}
+                  {/* Click hint for swapping */}
+                  {!linkingMode && i < selectedAttributes.length - 1 && (
+                    <g 
+                      className="cursor-pointer opacity-0 hover:opacity-100 transition-opacity"
+                      onClick={() => handleAxisClick(attr.key, i)}
                     >
-                      {scale.toFixed(1)}×
-                    </text>
+                      <rect x={x - 12} y={height / 2 - 12} width={24} height={24} fill="hsl(var(--primary) / 0.15)" rx={4} />
+                      <text x={x} y={height / 2 + 4} textAnchor="middle" fontSize={10} fill="hsl(var(--primary))">⇄</text>
+                    </g>
                   )}
                 </g>
               );
             })}
 
-            {/* Draw lines for each country */}
-            {normalizedData.map(({ country, normalized }) => {
-              // Generate path using local axisPositions for fullscreen
-              const pathPoints = selectedAttributes.map((attr, i) => {
-                const x = axisPositions[i];
-                const y = height * (1 - normalized[attr.key]);
-                return `${x},${y}`;
-              });
-              const pathD = `M ${pathPoints.join(' L ')}`;
+            {/* Claessen Paper: Flexible Linked Axes - Central axis with mini-PCPs */}
+            {viewMode === 'radial' && (() => {
+              const layout = getFlexibleLinkedLayout(width, height);
+              const { centerX, centerY, centralAxisLength, centralAttr, peripheralPositions } = layout;
+              
+              return (
+                <g>
+                  {/* Central axis label */}
+                  <text
+                    x={centerX}
+                    y={centerY}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="hsl(var(--primary))"
+                    fontSize={fullscreen ? 14 : 11}
+                    fontWeight="700"
+                    className="cursor-pointer"
+                    onClick={() => {}}
+                  >
+                    {centralAttr?.label || 'Center'}
+                  </text>
+                  
+                  {/* Peripheral axes and mini-PCPs */}
+                  {peripheralPositions.map((peripheral, i) => {
+                    const { attr, startX, startY, endX, endY, centerX: px, centerY: py, angle } = peripheral;
+                    
+                    // Calculate mini-PCP center axis position (closer to center)
+                    const miniCenterDist = Math.min(width, height) * 0.12;
+                    const miniCenterX = centerX + miniCenterDist * Math.cos(angle);
+                    const miniCenterY = centerY + miniCenterDist * Math.sin(angle);
+                    
+                    // Mini center axis perpendicular to angle
+                    const perpAngle = angle + Math.PI / 2;
+                    const miniAxisLen = centralAxisLength * 0.8;
+                    const miniStartX = miniCenterX - miniAxisLen * Math.cos(perpAngle) / 2;
+                    const miniStartY = miniCenterY - miniAxisLen * Math.sin(perpAngle) / 2;
+                    const miniEndX = miniCenterX + miniAxisLen * Math.cos(perpAngle) / 2;
+                    const miniEndY = miniCenterY + miniAxisLen * Math.sin(perpAngle) / 2;
+                    
+                    return (
+                      <g key={attr.key}>
+                        {/* Mini center axis (for this peripheral) */}
+                        <line
+                          x1={miniStartX} y1={miniStartY}
+                          x2={miniEndX} y2={miniEndY}
+                          stroke="hsl(var(--primary) / 0.5)"
+                          strokeWidth={2}
+                        />
+                        
+                        {/* Peripheral axis */}
+                        <line
+                          x1={startX} y1={startY}
+                          x2={endX} y2={endY}
+                          stroke="hsl(var(--border))"
+                          strokeWidth={2}
+                          className="cursor-pointer"
+                          onClick={() => handleAxisToCenter(attr.key)}
+                        />
+                        
+                        {/* Peripheral axis label */}
+                        <text
+                          x={px + (px - centerX) * 0.35}
+                          y={py + (py - centerY) * 0.35}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          fill="hsl(var(--foreground))"
+                          fontSize={fullscreen ? 11 : 9}
+                          fontWeight="600"
+                          className="cursor-pointer"
+                          onClick={() => handleAxisToCenter(attr.key)}
+                        >
+                          {attr.label}
+                        </text>
+                        
+                        {/* Mini-PCP lines connecting center axis value to peripheral axis value */}
+                        {normalizedData.map(({ country, normalized }) => {
+                          const centralVal = normalized[centralAttr.key];
+                          const peripheralVal = normalized[attr.key];
+                          
+                          // Position on mini center axis
+                          const cPos = {
+                            x: miniStartX + (miniEndX - miniStartX) * centralVal,
+                            y: miniStartY + (miniEndY - miniStartY) * centralVal,
+                          };
+                          
+                          // Position on peripheral axis
+                          const pPos = {
+                            x: startX + (endX - startX) * peripheralVal,
+                            y: startY + (endY - startY) * peripheralVal,
+                          };
+                          
+                          const isHighlighted = effectiveSelection.has(country.countryCode);
+                          const isHovered = hoveredCountry === country.countryCode;
+                          
+                          return (
+                            <line
+                              key={`${attr.key}-${country.countryCode}`}
+                              x1={cPos.x} y1={cPos.y}
+                              x2={pPos.x} y2={pPos.y}
+                              stroke={getLineColor(country.countryCode)}
+                              strokeWidth={isHovered ? 2 : isHighlighted ? 1.5 : 0.5}
+                              opacity={hoveredCountry && !isHovered ? 0.1 : isHighlighted ? 0.9 : 0.4}
+                              onMouseEnter={() => {
+                                setHoveredCountry(country.countryCode);
+                                if (focusMode) onMultiSelect?.(new Set([country.countryCode]));
+                              }}
+                              onMouseLeave={() => setHoveredCountry(null)}
+                              onClick={() => handleLineClick(country)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <title>{country.country}: {centralAttr.label} vs {attr.label}</title>
+                            </line>
+                          );
+                        })}
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })()}
+
+            {/* Draw flexible links (curved connections between non-adjacent axes) */}
+            {viewMode === 'flexible' && axisLinks.map(link => (
+              <g key={`link-bg-${link.id}`}>
+                {normalizedData.map(({ country, normalized }) => {
+                  const linkPath = generateLinkPath(normalized, link.sourceAxis, link.targetAxis, axisPositions, height);
+                  if (!linkPath) return null;
+                  
+                  return (
+                    <path
+                      key={`${link.id}-${country.countryCode}`}
+                      d={linkPath}
+                      fill="none"
+                      stroke={getLineColor(country.countryCode)}
+                      strokeWidth={getLineWidth(country.countryCode)}
+                      strokeDasharray="4,2"
+                      opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.1 : 0.7}
+                      onMouseEnter={() => setHoveredCountry(country.countryCode)}
+                      onMouseLeave={() => setHoveredCountry(null)}
+                      onClick={() => handleLineClick(country)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <title>{country.country} (linked)</title>
+                    </path>
+                  );
+                })}
+              </g>
+            ))}
+
+            {/* Draw lines for each country - Standard/Flexible modes only */}
+            {viewMode !== 'radial' && normalizedData.map(({ country, normalized }) => {
+              const pathD = generatePath(normalized, axisPositions, height, width, viewMode);
               
               return (
                 <path
@@ -540,7 +795,7 @@ export const InteractiveParallelCoordinates = ({
                   fill="none"
                   stroke={getLineColor(country.countryCode)}
                   strokeWidth={getLineWidth(country.countryCode)}
-                  opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
+                  opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.15 : 1}
                   onMouseEnter={() => {
                     setHoveredCountry(country.countryCode);
                     if (focusMode || localBrushMode === "hover") {
@@ -563,9 +818,31 @@ export const InteractiveParallelCoordinates = ({
                 </path>
               );
             })}
+
+            {/* Data points on axes for hovered country */}
+            {hoveredCountry && viewMode !== 'radial' && (
+              normalizedData
+                .filter(d => d.country.countryCode === hoveredCountry)
+                .map(({ country, normalized }) => (
+                  selectedAttributes.map((attr, i) => {
+                    const x = axisPositions[i];
+                    const y = height * (1 - normalized[attr.key]);
+                    const rawValue = country[attr.key] as number;
+                    
+                    return (
+                      <g key={`point-${attr.key}`}>
+                        <circle cx={x} cy={y} r={5} fill="hsl(var(--chart-3))" stroke="white" strokeWidth={2} />
+                        <text x={x + 8} y={y + 3} fill="hsl(var(--foreground))" fontSize={9} fontWeight="500">
+                          {typeof rawValue === 'number' ? rawValue.toLocaleString(undefined, { maximumFractionDigits: 1 }) : ''}
+                        </text>
+                      </g>
+                    );
+                  })
+                ))
+            )}
           </g>
         </svg>
-    </div>
+      </div>
     );
   };
 
@@ -580,7 +857,56 @@ export const InteractiveParallelCoordinates = ({
                 <X className="h-3 w-3 mr-1" />{effectiveSelection.size}
               </Button>
             )}
-            {/* Brush mode toggle - Focus and Hover are the same */}
+            
+            {/* View mode selector */}
+            <div className="flex items-center border rounded overflow-hidden">
+              <Button
+                variant={viewMode === "standard" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("standard")}
+                className="rounded-none px-2 h-6 text-xs"
+                title="Standard parallel coordinates"
+              >
+                <LayoutList className="h-3 w-3" />
+              </Button>
+              <Button
+                variant={viewMode === "flexible" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("flexible")}
+                className="rounded-none px-2 h-6 text-xs"
+                title="Flexible linked axes - compare any dimensions"
+              >
+                <Link2 className="h-3 w-3" />
+              </Button>
+              <Button
+                variant={viewMode === "radial" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("radial")}
+                className="rounded-none px-2 h-6 text-xs"
+                title="Radial/Star layout"
+              >
+                <LayoutGrid className="h-3 w-3" />
+              </Button>
+            </div>
+
+            {/* Link mode toggle for flexible mode */}
+            {viewMode === "flexible" && (
+              <Button
+                variant={linkingMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setLinkingMode(!linkingMode);
+                  setSelectedAxisForLink(null);
+                }}
+                className="h-6 text-xs px-2"
+                title="Click two axes to create a link"
+              >
+                {linkingMode ? <Unlink className="h-3 w-3 mr-1" /> : <Link2 className="h-3 w-3 mr-1" />}
+                {linkingMode ? "Done" : "Link"}
+              </Button>
+            )}
+
+            {/* Brush mode toggle - Focus and Hover are the same (like ScatterPlotMatrix) */}
             <div className="flex items-center border rounded overflow-hidden">
               <Button
                 variant={localBrushMode === "select" && !focusMode ? "default" : "ghost"}
@@ -596,14 +922,15 @@ export const InteractiveParallelCoordinates = ({
                 size="sm"
                 onClick={() => { setLocalBrushMode("hover"); setFocusMode(true); }}
                 className="rounded-none px-2 h-6 text-xs"
-                title="Focus Mode - Highlight on hover"
+                title="Focus/Hover Mode - Select on hover"
               >
                 <Focus className="h-3 w-3 mr-1" />Focus
               </Button>
             </div>
+
             <Select onValueChange={addAttribute}>
-              <SelectTrigger className="w-[100px] h-6 text-xs">
-                <SelectValue placeholder="Add..." />
+              <SelectTrigger className="w-[80px] h-6 text-xs">
+                <SelectValue placeholder="+ Axis" />
               </SelectTrigger>
               <SelectContent>
                 {availableAttributes
@@ -619,6 +946,37 @@ export const InteractiveParallelCoordinates = ({
           </div>
         </div>
 
+        {/* Active links display */}
+        {viewMode === "flexible" && axisLinks.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            <span className="text-xs text-muted-foreground">Links:</span>
+            {axisLinks.map(link => {
+              const source = selectedAttributes.find(a => a.key === link.sourceAxis);
+              const target = selectedAttributes.find(a => a.key === link.targetAxis);
+              return (
+                <Badge
+                  key={link.id}
+                  variant="outline"
+                  className="text-xs px-1.5 py-0 bg-primary/10 cursor-pointer"
+                  onClick={() => removeLink(link.id)}
+                >
+                  {source?.label.slice(0, 6)} ↔ {target?.label.slice(0, 6)}
+                  <X className="h-3 w-3 ml-1" />
+                </Badge>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Help text for linking mode */}
+        {linkingMode && (
+          <p className="text-xs text-muted-foreground mb-1">
+            {selectedAxisForLink 
+              ? `Click another axis to link with "${selectedAttributes.find(a => a.key === selectedAxisForLink)?.label}"`
+              : "Click an axis to start linking"}
+          </p>
+        )}
+
         {/* Compact draggable attribute chips */}
         <div className="flex flex-wrap gap-1 mb-1 flex-shrink-0">
           {selectedAttributes.map((attr, index) => (
@@ -629,17 +987,22 @@ export const InteractiveParallelCoordinates = ({
               onDragOver={(e) => handleDragOver(e, index)}
               onDrop={() => handleDrop(index)}
               onDragEnd={handleDragEnd}
+              onClick={() => !linkingMode && handleAxisClick(attr.key, index)}
               className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-grab active:cursor-grabbing transition-all ${
-                draggedIndex === index 
-                  ? 'bg-primary/30 scale-105' 
-                  : dragOverIndex === index 
-                    ? 'bg-primary/20 ring-1 ring-primary' 
-                    : 'bg-primary/10'
+                selectedAxisForLink === attr.key
+                  ? 'bg-primary text-primary-foreground'
+                  : draggedIndex === index 
+                    ? 'bg-primary/30 scale-105' 
+                    : dragOverIndex === index 
+                      ? 'bg-primary/20 ring-1 ring-primary' 
+                      : linkingMode
+                        ? 'bg-primary/10 hover:bg-primary/30 cursor-pointer'
+                        : 'bg-primary/10'
               }`}
             >
               <span className="select-none">{attr.label.slice(0, 12)}</span>
               {selectedAttributes.length > 2 && (
-                <X className="h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeAttribute(attr.key); }} />
+                <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={(e) => { e.stopPropagation(); removeAttribute(attr.key); }} />
               )}
             </div>
           ))}
