@@ -144,21 +144,39 @@ export const TopCountriesChart = ({
 
   // Sort countries by the selected metric (default view)
   const topCountries = useMemo(() => {
-    return withValues
+    // Get top countries by metric
+    const top = withValues
       .slice()
       .sort((a, b) => {
         const aValue = (a[metric] as number) ?? 0;
         const bValue = (b[metric] as number) ?? 0;
         return bValue - aValue;
       })
-      .slice(0, limit)
-      .map((c, index) => ({
-        country: c,
-        name: c.country.length > 12 ? c.country.slice(0, 12) + "..." : c.country,
-        value: c[metric] as number,
-        index,
-      }));
-  }, [withValues, metric, limit]);
+      .slice(0, limit);
+    
+    // Add highlighted countries that aren't in top N
+    const topCodes = new Set(top.map(c => c.countryCode));
+    const additionalHighlighted = withValues.filter(c => 
+      highlightedCountries?.has(c.countryCode) && !topCodes.has(c.countryCode)
+    );
+    
+    // Combine and sort
+    const combined = [...top, ...additionalHighlighted]
+      .sort((a, b) => {
+        const aValue = (a[metric] as number) ?? 0;
+        const bValue = (b[metric] as number) ?? 0;
+        return bValue - aValue;
+      });
+    
+    return combined.map((c, index) => ({
+      country: c,
+      name: c.country.length > 12 ? c.country.slice(0, 12) + "..." : c.country,
+      value: c[metric] as number,
+      index,
+      isHighlighted: highlightedCountries?.has(c.countryCode) || false,
+      isAdditional: !topCodes.has(c.countryCode)
+    }));
+  }, [withValues, metric, limit, highlightedCountries]);
 
   // Multi-attribute data for fullscreen mode
   const multiAttributeData = useMemo(() => {

@@ -16,6 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 interface CollapsibleFilterPanelProps {
   filters: FilterState;
@@ -102,23 +103,23 @@ export const CollapsibleFilterPanel = ({
     };
 
     return {
-      electricity: getStats("electricity_access_percent"),
       electricityCap: getStats("electricity_capacity_per_capita"),
       temp: getStats("Mean_Temp"),
       gdp: getStats("Real_GDP_per_Capita_USD"),
       internet: getStats("internet_users_per_100"),
+      co2: getStats("co2_per_capita_tonnes"),
     };
   }, [countryData]);
 
   const resetFilters = () => {
     onFiltersChange({
-      renewableEnergy: [0, 100],
       electricityCost: [0, 100],
       temperature: [-20, 50],
       gdp: [0, 100000],
       internetSpeed: [0, 1000],
-      selectedMetric: "renewableEnergyPercent",
+      selectedMetric: "Real_GDP_per_Capita_USD",
       selectedCountries: [],
+      co2PerCapita: [0, 16539924]
     });
     onHighlightedCountriesChange?.(new Set());
   };
@@ -152,12 +153,12 @@ export const CollapsibleFilterPanel = ({
   return (
     <div
       className={cn(
-        "fixed left-0 top-0 h-full z-50 transition-all duration-300 ease-in-out flex",
+        "fixed left-0 top-0 h-full z-50 transition-transform duration-150 ease-in-out flex",
         isOpen ? "translate-x-0" : "-translate-x-[calc(100%-40px)]"
       )}
     >
       {/* Filter panel */}
-      <Card className="w-96 h-full rounded-none border-r shadow-2xl bg-card/95 backdrop-blur-md">
+      <Card className="w-96 h-full rounded-none border-r shadow-lg bg-card">
         <div className="p-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Filter className="h-5 w-5" />
@@ -207,41 +208,6 @@ export const CollapsibleFilterPanel = ({
             
             {activeTab === "range" ? (
               <>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm font-medium">Renewable Energy %</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Electricity Access %</p>
-                            <p className="text-xs font-mono">Range: {dataStats.electricity.min.toFixed(1)}% - {dataStats.electricity.max.toFixed(1)}%</p>
-                            <p className="text-xs font-mono">Avg: {dataStats.electricity.avg.toFixed(1)}%</p>
-                            <p className="text-xs text-muted-foreground">{dataStats.electricity.count} countries</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <span className="text-xs font-semibold text-primary">
-                      {filters.renewableEnergy[0]}% - {filters.renewableEnergy[1]}%
-                    </span>
-                  </div>
-                  <ScentedWidget data={getDataDistribution("electricity_access_percent")} />
-                  <Slider
-                    value={filters.renewableEnergy}
-                    onValueChange={(value) =>
-                      onFiltersChange({ ...filters, renewableEnergy: value as [number, number] })
-                    }
-                    min={0}
-                    max={100}
-                    step={1}
-                    className="w-full"
-                  />
-                </div>
-
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
@@ -383,13 +349,48 @@ export const CollapsibleFilterPanel = ({
                 </div>
 
                 <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">CO₂ per Capita (tonnes)</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">CO₂ per Capita</p>
+                            <p className="text-xs font-mono">Range: {dataStats.co2.min.toFixed(2)} - {dataStats.co2.max.toFixed(2)}</p>
+                            <p className="text-xs font-mono">Avg: {dataStats.co2.avg.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">{dataStats.co2.count} countries</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <span className="text-xs font-semibold text-primary">
+                      {filters.co2PerCapita[0]} - {filters.co2PerCapita[1]} tonnes
+                    </span>
+                  </div>
+                  <ScentedWidget data={getDataDistribution("co2_per_capita_tonnes")} />
+                  <Slider
+                    value={filters.co2PerCapita}
+                    onValueChange={(value) =>
+                      onFiltersChange({ ...filters, co2PerCapita: value as [number, number] })
+                    }
+                    min={0}
+                    max={30}
+                    step={0.5}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="space-y-3">
                   <Label className="text-sm font-medium mb-3 block">Display Metric</Label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-2">
                     {[
-                      { value: "renewableEnergyPercent", label: "Renewable %" },
-                      { value: "gdpPerCapita", label: "GDP/Capita" },
-                      { value: "internetSpeed", label: "Internet" },
-                      { value: "electricityCost", label: "Electricity" },
+                      { value: "Real_GDP_per_Capita_USD", label: "GDP/Capita" },
+                      { value: "internet_users_per_100", label: "Internet Users" },
+                      { value: "electricity_capacity_per_capita", label: "Electric Capacity" },
+                      { value: "co2_per_capita_tonnes", label: "CO₂ per Capita" },
                     ].map((metric) => (
                       <Button
                         key={metric.value}
@@ -402,6 +403,34 @@ export const CollapsibleFilterPanel = ({
                         {metric.label}
                       </Button>
                     ))}
+                  </div>
+                  
+                  {/* Custom metric selector */}
+                  <div className="space-y-2 border-t pt-2 mt-2">
+                    <Label className="text-xs font-medium">Add Custom Metric</Label>
+                    <Select 
+                      onValueChange={(value) => {
+                        onFiltersChange({ ...filters, selectedMetric: value });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Choose metric..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Real_GDP_per_Capita_USD">GDP per Capita</SelectItem>
+                        <SelectItem value="Real_GDP_PPP_billion_USD">GDP (PPP)</SelectItem>
+                        <SelectItem value="Real_GDP_Growth_Rate_percent">GDP Growth Rate</SelectItem>
+                        <SelectItem value="internet_users_per_100">Internet Users</SelectItem>
+                        <SelectItem value="broadband_subs_per_100">Broadband Subscribers</SelectItem>
+                        <SelectItem value="mobile_subs_per_100">Mobile Subscribers</SelectItem>
+                        <SelectItem value="electricity_capacity_per_capita">Electric Capacity</SelectItem>
+                        <SelectItem value="co2_per_capita_tonnes">CO₂ per Capita</SelectItem>
+                        <SelectItem value="co2_per_gdp_tonnes_per_billion">CO₂ per GDP</SelectItem>
+                        <SelectItem value="road_density_per_1000km2">Road Density</SelectItem>
+                        <SelectItem value="rail_density_per_1000km2">Rail Density</SelectItem>
+                        <SelectItem value="airports_per_million">Airports per Million</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </>

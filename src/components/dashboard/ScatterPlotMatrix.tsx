@@ -105,9 +105,11 @@ export const ScatterPlotMatrix = ({
     "electricity_capacity_per_capita",
   ]);
   const [useLogScales, setUseLogScales] = useState(true);
-  // Brush state for each cell (hover-based brushing)
+  // Brush state for drag-select brushing
   const [brushingCell, setBrushingCell] = useState<string | null>(null);
-  const [brushCenter, setBrushCenter] = useState<{ x: number; y: number } | null>(null);
+  const [brushStart, setBrushStart] = useState<{ x: number; y: number } | null>(null);
+  const [brushEnd, setBrushEnd] = useState<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   // Brushing is available for matrix layouts (3x3, 4x4) when enabled
   const isBrushingEnabled = brushEnabled && matrixSize !== "2x2";
   // Track currently selected cell for zooming
@@ -254,24 +256,23 @@ export const ScatterPlotMatrix = ({
       }));
   }, [data, useLogScales, matrixSize, getAttributeConfig]);
 
-  // Memoize reference area to avoid re-creating on each render
+  // Memoize reference area for drag selection
   const renderReferenceArea = useMemo(() => {
-    if (!brushingCell || !brushCenter) return null;
+    if (!brushingCell || !brushStart || !brushEnd) return null;
     
-    const hoverBox = 8; // half-size of hover selection box
     return (
       <ReferenceArea
-        x1={brushCenter.x - hoverBox}
-        x2={brushCenter.x + hoverBox}
-        y1={brushCenter.y - hoverBox}
-        y2={brushCenter.y + hoverBox}
+        x1={brushStart.x}
+        x2={brushEnd.x}
+        y1={brushStart.y}
+        y2={brushEnd.y}
         strokeOpacity={0.8}
         stroke="hsl(var(--primary))"
         fill="hsl(var(--primary))"
         fillOpacity={0.2}
       />
     );
-  }, [brushingCell, brushCenter]);
+  }, [brushingCell, brushStart, brushEnd]);
 
   const getLabel = (key: keyof CountryData) => {
     return attributeOptions.find(a => a.key === key)?.label || String(key);
@@ -434,15 +435,10 @@ export const ScatterPlotMatrix = ({
             
             cells.push(
               <div key={cellKey} className="h-full rounded border border-border/50 bg-muted/10 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-medium bg-background/70 px-1 rounded">
-                    {getLabel(xAttr)}{useLogScales && getAttributeConfig(xAttr).useLogScale ? ' (log10)' : ''}
-                  </span>
-                </div>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={histData}
-                    margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
+                    margin={{ top: 2, right: 2, bottom: 2, left: 2 }}
                   >
                     <Tooltip
                       formatter={(value: number, name: string) => {
@@ -491,36 +487,35 @@ export const ScatterPlotMatrix = ({
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart 
-                  margin={{ top: 5, right: 5, bottom: 20, left: 25 }}
-                  onMouseMove={(e) => {
-                    if (e?.xValue !== undefined && e?.yValue !== undefined && isBrushingEnabled) {
-                      // Throttle mouse events for better performance
-                      const now = Date.now();
-                      if (now - lastBrushTime.current < 30) return; // ~33fps throttle
-                      lastBrushTime.current = now;
-                      
+                  margin={{ top: 2, right: 10, bottom: 24, left: 32 }}
+                  onMouseDown={(e) => {
+                    if (e?.xValue !== undefined && e?.yValue !== undefined) {
                       setBrushingCell(cellKey);
-                      setBrushCenter({ x: e.xValue, y: e.yValue });
-                      
-                      // Only process brushing in hover mode or if cell is clicked in select mode
-                      if (brushMode === "hover" || (brushMode === "select" && selectedCell === cellKey)) {
-                        handleBrushSelect(
-                          cellKey,
-                          xAttr,
-                          yAttr,
-                          e.xValue - hoverBox,
-                          e.yValue - hoverBox,
-                          e.xValue + hoverBox,
-                          e.yValue + hoverBox
-                        );
-                      }
+                      setBrushStart({ x: e.xValue, y: e.yValue });
+                      setBrushEnd({ x: e.xValue, y: e.yValue });
+                      setIsDragging(true);
+                    }
+                  }}
+                  onMouseMove={(e) => {
+                    if (isDragging && isBrushingThisCell && brushStart && e?.xValue !== undefined && e?.yValue !== undefined) {
+                      setBrushEnd({ x: e.xValue, y: e.yValue });
+                    }
+                  }}
+                  onMouseUp={() => {
+                    if (isDragging && isBrushingThisCell && brushStart && brushEnd) {
+                      handleBrushSelect(cellKey, xAttr, yAttr, brushStart.x, brushStart.y, brushEnd.x, brushEnd.y);
+                      setBrushingCell(null);
+                      setBrushStart(null);
+                      setBrushEnd(null);
+                      setIsDragging(false);
                     }
                   }}
                   onMouseLeave={() => {
                     if (isBrushingThisCell) {
                       setBrushingCell(null);
-                      setBrushCenter(null);
-                      onBrushSelection?.(new Set());
+                      setBrushStart(null);
+                      setBrushEnd(null);
+                      setIsDragging(false);
                     }
                   }}
                 >
@@ -534,11 +529,12 @@ export const ScatterPlotMatrix = ({
                     scale={useLogScales && getAttributeConfig(xAttr).useLogScale ? 'linear' : 'auto'}
                     domain={['auto', 'auto']}
                     label={row === gridSize - 1 ? {
-                      value: getLabel(xAttr).slice(0, 10) + 
+                      value: getLabel(xAttr) + 
                              (useLogScales && getAttributeConfig(xAttr).useLogScale ? ' (log10)' : ''),
                       position: "bottom",
-                      fontSize: 8,
-                      fill: "hsl(var(--muted-foreground))",
+                      dy: 4,
+                      fontSize: 9,
+                      fill: "hsl(var(--foreground))",
                     } : undefined}
                   />
                   <YAxis
@@ -551,12 +547,13 @@ export const ScatterPlotMatrix = ({
                     scale={useLogScales && getAttributeConfig(yAttr).useLogScale ? 'linear' : 'auto'}
                     domain={['auto', 'auto']}
                     label={col === 0 ? {
-                      value: getLabel(yAttr).slice(0, 10) + 
+                      value: getLabel(yAttr) + 
                              (useLogScales && getAttributeConfig(yAttr).useLogScale ? ' (log10)' : ''),
                       angle: -90,
                       position: "left",
-                      fontSize: 8,
-                      fill: "hsl(var(--muted-foreground))",
+                      dx: -28,
+                      fontSize: 9,
+                      fill: "hsl(var(--foreground))",
                     } : undefined}
                   />
                   
@@ -566,16 +563,21 @@ export const ScatterPlotMatrix = ({
                   <Tooltip
                     cursor={{ strokeDasharray: "3 3" }}
                     contentStyle={tooltipStyle}
-                    formatter={(value: number, name, props) => {
-                      // Display original values in tooltip
-                      const payload = props.payload;
-                      if (name === 'x') {
-                        return [payload.originalX.toFixed(2)];
-                      } else {
-                        return [payload.originalY.toFixed(2)];
-                      }
+                    content={(props) => {
+                      if (!props.active || !props.payload?.[0]) return null;
+                      const point = props.payload[0].payload;
+                      return (
+                        <div className="bg-popover border rounded-lg p-2 shadow-lg">
+                          <p className="font-semibold text-sm">{point.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {getLabel(xAttr)}: {point.originalX.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {getLabel(yAttr)}: {point.originalY.toFixed(2)}
+                          </p>
+                        </div>
+                      );
                     }}
-                    labelFormatter={(_, payload) => payload[0]?.payload?.name || ""}
                   />
                   <Scatter
                     data={scatterData}
@@ -643,7 +645,7 @@ export const ScatterPlotMatrix = ({
       }
     }
     return cells;
-  }, [gridSize, activeAttributes, useLogScales, data.length, brushMode, brushingCell, brushCenter, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick]);
+  }, [gridSize, activeAttributes, useLogScales, data.length, brushMode, brushingCell, brushStart, brushEnd, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick]);
 
   // Render normal scatter plot for 2x2
   const renderNormalScatter = useMemo(() => {

@@ -66,11 +66,11 @@ export interface CountryData {
 }
 
 export interface FilterState {
-  renewableEnergy: [number, number];
   electricityCost: [number, number];
   temperature: [number, number];
   gdp: [number, number];
   internetSpeed: [number, number];
+  co2PerCapita: [number, number];
   selectedMetric: string;
   selectedCountries: string[]; // Country codes for filtering
 }

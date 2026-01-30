@@ -20,6 +20,7 @@ interface SpiderChartProps {
   onCountrySelect?: (country: CountryData, options?: { toggleCompare?: boolean }) => void;
   onClearComparison?: () => void;
   onCompareCountriesChange?: (countries: CountryData[]) => void;
+  highlightedCountries?: Set<string>;
 }
 
 interface RadarAttribute {
@@ -60,6 +61,7 @@ export const SpiderChart = ({
   onCountrySelect,
   onClearComparison,
   onCompareCountriesChange,
+  highlightedCountries,
 }: SpiderChartProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   
@@ -147,18 +149,26 @@ export const SpiderChart = ({
         return Math.round(normalized * 100);
       };
 
-      // Add selected country
-      if (selectedCountry) {
+      // Add highlighted countries from brushing
+      if (highlightedCountries && highlightedCountries.size > 0) {
+        data.filter(c => highlightedCountries.has(c.countryCode)).slice(0, 5).forEach(country => {
+          result[country.country] = normalizeValue(country);
+        });
+      } else if (selectedCountry) {
+        // Add selected country
         result[selectedCountry.country] = normalizeValue(selectedCountry);
-      }
-
-      // Add comparison countries
-      compareCountries.forEach(country => {
-        result[country.country] = normalizeValue(country);
-      });
-
-      // If no countries selected, show default 5 countries
-      if (!selectedCountry && compareCountries.length === 0) {
+        
+        // Add comparison countries
+        compareCountries.forEach(country => {
+          result[country.country] = normalizeValue(country);
+        });
+      } else if (compareCountries.length > 0) {
+        // Add comparison countries
+        compareCountries.forEach(country => {
+          result[country.country] = normalizeValue(country);
+        });
+      } else {
+        // If no countries selected, show default 5 countries
         const defaultCountries = data.filter(c => 
           DEFAULT_COUNTRIES.includes(c.country.toUpperCase())
         );
@@ -172,10 +182,14 @@ export const SpiderChart = ({
     });
 
     return { radarData, ranges };
-  }, [data, selectedCountry, compareCountries]);
+  }, [data, selectedCountry, compareCountries, highlightedCountries]);
 
-  // Get countries to display
+  // Get countries to display - include highlighted countries from brushing
   const displayCountries = useMemo(() => {
+    // If there are highlighted countries from brushing, show them
+    if (highlightedCountries && highlightedCountries.size > 0) {
+      return data.filter(c => highlightedCountries.has(c.countryCode)).slice(0, 5);
+    }
     if (selectedCountry) {
       return [selectedCountry, ...compareCountries.filter(c => c.countryCode !== selectedCountry.countryCode)];
     }
@@ -186,7 +200,7 @@ export const SpiderChart = ({
     return data.filter(c => 
       DEFAULT_COUNTRIES.includes(c.country.toUpperCase())
     );
-  }, [data, selectedCountry, compareCountries]);
+  }, [data, selectedCountry, compareCountries, highlightedCountries]);
 
   const colors = [
     "hsl(var(--chart-1))",

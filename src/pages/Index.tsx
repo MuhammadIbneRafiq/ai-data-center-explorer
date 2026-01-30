@@ -22,12 +22,12 @@ type SectionId = "barchart" | "spider" | "scatter" | "parallel";
 
 const Index = () => {
   const [filters, setFilters] = useState<FilterState>({
-    renewableEnergy: [0, 100],
     electricityCost: [0, 1],
     temperature: [-50, 50],
     gdp: [0, 100000],
     internetSpeed: [0, 1000],
-    selectedMetric: "renewableEnergyPercent",
+    co2PerCapita: [0, 30], // 0-30 tonnes range for CO2 per capita
+    selectedMetric: "Real_GDP_per_Capita_USD",
     selectedCountries: [],
   });
 
@@ -46,6 +46,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
   const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
+  const [showLegend, setShowLegend] = useState(false);
   // Brush and linking settings
   const [brushConfig, setBrushConfig] = useState({
     // Which visualizations participate in brushing
@@ -113,11 +114,11 @@ const Index = () => {
   };
 
   const filteredData = countryData.filter((country) => {
-    // Use the actual field names from the CSV data
+    // Filter by CO2 per capita
     if (
-      country.electricity_access_percent !== undefined &&
-      (country.electricity_access_percent < filters.renewableEnergy[0] ||
-        country.electricity_access_percent > filters.renewableEnergy[1])
+      country.co2_per_capita_tonnes !== undefined &&
+      (country.co2_per_capita_tonnes < filters.co2PerCapita[0] ||
+        country.co2_per_capita_tonnes > filters.co2PerCapita[1])
     ) {
       return false;
     }
@@ -209,10 +210,11 @@ const Index = () => {
       <CollapsibleFilterPanel
         filters={filters}
         onFiltersChange={setFilters}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         countryData={countryData}
         onHighlightedCountriesChange={setHighlightedCountries}
         highlightedCountries={highlightedCountries}
+        isOpen={isSidebarOpen}
+        onToggle={setIsSidebarOpen}
       >
         {/* Item reduction by slicing/cutting */}
         <div className="border rounded-md p-4 mt-4 space-y-4">
@@ -340,6 +342,43 @@ const Index = () => {
       <div className={`h-screen flex flex-col bg-background p-2 overflow-hidden transition-all duration-300 ${
         isSidebarOpen ? 'pl-[384px]' : 'pl-2'
       }`}>
+        {/* Color Legend for highlighted countries */}
+        {highlightedCountries.size > 0 && (
+          <div className="absolute top-14 right-4 z-50 bg-card/95 backdrop-blur border rounded-lg p-2 shadow-lg max-w-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold">Selected Countries</span>
+              <button
+                onClick={() => setHighlightedCountries(new Set())}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {Array.from(highlightedCountries).slice(0, 8).map((code, index) => {
+                const country = countryData.find(c => c.countryCode === code);
+                const colors = [
+                  "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", 
+                  "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--chart-6))",
+                  "hsl(var(--chart-7))", "hsl(var(--chart-8))"
+                ];
+                return (
+                  <div key={code} className="flex items-center gap-1 bg-muted/50 rounded px-1 py-0.5">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: colors[index % colors.length] }}
+                    />
+                    <span className="text-[10px]">{country?.country || code}</span>
+                  </div>
+                );
+              })}
+              {highlightedCountries.size > 8 && (
+                <span className="text-[10px] text-muted-foreground">+{highlightedCountries.size - 8} more</span>
+              )}
+            </div>
+          </div>
+        )}
+        
         {/* Compact Header */}
         <header className="flex items-center justify-between flex-shrink-0 mb-2">
           <div className="flex-1">
@@ -436,6 +475,7 @@ const Index = () => {
                       onCountrySelect={handleSpiderCountrySelect}
                       onClearComparison={() => setCompareCountries([])}
                       onCompareCountriesChange={handleCompareCountriesChange}
+                      highlightedCountries={highlightedCountries}
                     />
                   </div>
                 </ResizablePanel>

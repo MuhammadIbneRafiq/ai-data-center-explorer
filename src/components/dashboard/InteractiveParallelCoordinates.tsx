@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, MousePointer2, Maximize2 } from "lucide-react";
+import { X, MousePointer2, Maximize2, Search, GitBranch } from "lucide-react";
 import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface InteractiveParallelCoordinatesProps {
@@ -85,11 +85,19 @@ export const InteractiveParallelCoordinates = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
+  // PCP variant: standard or flexible (radial)
+  const [pcpVariant, setPcpVariant] = useState<'standard' | 'flexible'>('standard');
+  
   // Flexible axis scaling - for distorted zooming on specific axes
   const [axisScales, setAxisScales] = useState<Record<string, number>>({});
   // Track dragging state for axis scaling
   const [isDraggingAxis, setIsDraggingAxis] = useState<string | null>(null);
   const [dragStartY, setDragStartY] = useState<number | null>(null);
+  
+  // Fisheye magnification for edge bundling areas
+  const [fisheyeEnabled, setFisheyeEnabled] = useState(false);
+  const [fisheyeCenter, setFisheyeCenter] = useState<{ x: number; y: number } | null>(null);
+  const [fisheyeRadius] = useState(100);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -334,15 +342,64 @@ export const InteractiveParallelCoordinates = ({
   }, [isDraggingAxis, handleAxisMouseMove, handleAxisMouseUp]);
   
   const generatePath = (normalized: Record<string, number>) => {
-    const points = selectedAttributes.map((attr, i) => {
-      const x = axisPositions[i];
-      const y = height * (1 - normalized[attr.key]);
-      return `${x},${y}`;
-    });
-    
-    return `M ${points.join(' L ')}`;
+    if (pcpVariant === 'flexible') {
+      // Generate curved path for flexible/radial layout
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = Math.min(width, height) * 0.35;
+      const angleStep = (2 * Math.PI) / selectedAttributes.length;
+      
+      const points = selectedAttributes.map((attr, i) => {
+        const angle = i * angleStep - Math.PI / 2;
+        const value = normalized[attr.key];
+        const r = radius * (0.2 + 0.8 * value);
+        const x = centerX + r * Math.cos(angle);
+        const y = centerY + r * Math.sin(angle);
+        return { x, y };
+      });
+      
+      // Create smooth curve through points
+      let path = `M ${points[0].x},${points[0].y}`;
+      for (let i = 0; i < points.length; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % points.length];
+        const cp1x = p1.x + (p2.x - p1.x) * 0.3;
+        const cp1y = p1.y + (p2.y - p1.y) * 0.3;
+        const cp2x = p2.x - (p2.x - p1.x) * 0.3;
+        const cp2y = p2.y - (p2.y - p1.y) * 0.3;
+        path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+      }
+      return path;
+    } else {
+      // Standard parallel coordinates path
+      const points = selectedAttributes.map((attr, i) => {
+        const x = axisPositions[i];
+        const y = height * (1 - normalized[attr.key]);
+        return `${x},${y}`;
+      });
+      return `M ${points.join(' L ')}`;
+    }
   };
 
+  // Apply fisheye distortion to coordinates
+  const applyFisheye = (x: number, y: number) => {
+    if (!fisheyeEnabled || !fisheyeCenter) return { x, y };
+    
+    const dx = x - fisheyeCenter.x;
+    const dy = y - fisheyeCenter.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < fisheyeRadius) {
+      const distortionFactor = 2.5;
+      const scale = (1 - Math.pow(distance / fisheyeRadius, 2)) * distortionFactor + 1;
+      return {
+        x: fisheyeCenter.x + dx * scale,
+        y: fisheyeCenter.y + dy * scale
+      };
+    }
+    return { x, y };
+  };
+  
   const parallelContent = (fullscreen = false) => {
     // Calculate dimensions based on whether we're in fullscreen
   const contentDimensions = fullscreen 
@@ -370,7 +427,7 @@ export const InteractiveParallelCoordinates = ({
   });
 
     return (
-      <div className={`relative ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
+      <div className={`relative w-full ${fullscreen ? "h-full" : "flex-1 min-h-0"}`}>
         <svg
           ref={!fullscreen ? svgRef : undefined}
           width="100%"
@@ -378,6 +435,20 @@ export const InteractiveParallelCoordinates = ({
           className="overflow-visible"
           viewBox={`0 0 ${contentDimensions.width} ${contentDimensions.height}`}
           preserveAspectRatio="xMidYMid meet"
+          onMouseMove={(e) => {
+            if (fisheyeEnabled) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setFisheyeCenter({
+                x: ((e.clientX - rect.left) / rect.width) * contentDimensions.width,
+                y: ((e.clientY - rect.top) / rect.height) * contentDimensions.height
+              });
+            }
+          }}
+          onMouseLeave={() => {
+            if (fisheyeEnabled) {
+              setFisheyeCenter(null);
+            }
+          }}
         >
           <g transform={`translate(${margin.left}, ${margin.top})`}>
             {/* Draw axes */}
@@ -489,6 +560,28 @@ export const InteractiveParallelCoordinates = ({
             >
               <MousePointer2 className="h-3 w-3" />
             </Button>
+            <Button
+              variant={pcpVariant === 'flexible' ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPcpVariant(pcpVariant === 'standard' ? 'flexible' : 'standard')}
+              className="h-6 text-xs px-2"
+              title="Toggle Flexible PCP"
+            >
+              <GitBranch className="h-3 w-3 mr-1" />
+              {pcpVariant === 'standard' ? 'Linear' : 'Flexible'}
+            </Button>
+            {isFullscreen && (
+              <Button
+                variant={fisheyeEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFisheyeEnabled(!fisheyeEnabled)}
+                className="h-6 text-xs px-2"
+                title="Toggle Fisheye Magnification"
+              >
+                <Search className="h-3 w-3 mr-1" />
+                Fisheye
+              </Button>
+            )}
             <Select onValueChange={addAttribute}>
               <SelectTrigger className="w-[100px] h-6 text-xs">
                 <SelectValue placeholder="Add..." />
