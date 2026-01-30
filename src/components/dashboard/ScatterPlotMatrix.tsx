@@ -703,8 +703,8 @@ export const ScatterPlotMatrix = ({
                     }}
                   >
                     {scatterData.map((entry) => {
-                      // Base radius - ULTRA tiny dots
-                      const baseR = matrixSize === "3x3" ? 0.001 : matrixSize === "2x2" ? 0.002 : 0.0008;
+                      // Base radius - Even SMALLER dots for 3x3 and 4x4
+                      const baseR = matrixSize === "3x3" ? 0.0005 : matrixSize === "2x2" ? 0.002 : 0.0004;
                       const isHovered = hoveredCountry === entry.country.countryCode;
                       const isHighlighted = highlightedCountries?.has(entry.country.countryCode);
                       
@@ -717,31 +717,17 @@ export const ScatterPlotMatrix = ({
                       }
                       
                       return (
-                        <g key={entry.country.countryCode}>
-                          <circle
-                            cx={entry.x}
-                            cy={entry.y}
-                            r={isHovered ? finalR * 1.2 : finalR}
-                            fill={isHighlighted ? getPointColor(entry.country.countryCode) : "#64748b"}
-                            fillOpacity={isHighlighted ? 1 : 0.6}
-                            stroke={isHovered ? "hsl(var(--primary))" : isHighlighted ? getPointColor(entry.country.countryCode) : "none"}
-                            strokeWidth={isHovered ? 1.5 : isHighlighted ? 0.5 : 0}
-                            cursor="pointer"
-                          />
-                          {/* Show labels in focus mode for highlighted points */}
-                          {focusMode && isHighlighted && (
-                            <text 
-                              x={entry.x} 
-                              y={entry.y - finalR - 2}
-                              textAnchor="middle"
-                              fill={getPointColor(entry.country.countryCode)}
-                              style={{ fontSize: 8, fontWeight: "bold" }}
-                              pointerEvents="none"
-                            >
-                              {entry.country.country.slice(0, 8)}
-                            </text>
-                          )}
-                        </g>
+                        <Cell
+                          key={entry.country.countryCode}
+                          fill={isHighlighted ? getPointColor(entry.country.countryCode) : "#3b82f6"}
+                          fillOpacity={isHighlighted ? 0.5 : 0.3}
+                          stroke={isHovered ? "hsl(var(--primary))" : isHighlighted ? getPointColor(entry.country.countryCode) : "none"}
+                          strokeWidth={isHovered ? 1.5 : isHighlighted ? 0.5 : 0}
+                          r={isHovered ? finalR * 1.2 : finalR}
+                          style={{
+                            cursor: "pointer"
+                          }}
+                        />
                       );
                     })}
                   </Scatter>
@@ -848,10 +834,12 @@ export const ScatterPlotMatrix = ({
             >
               {scatterData.map((entry) => {
                 const isHovered = hoveredCountry === entry.country.countryCode;
+                const isHighlighted = highlightedCountries?.has(entry.country.countryCode);
                 return (
                   <Cell
                     key={entry.country.countryCode}
                     fill={getPointColor(entry.country.countryCode)}
+                    fillOpacity={isHighlighted ? 0.7 : 0.4}
                     style={{
                       cursor: isBrushingEnabled ? "crosshair" : "pointer",
                       opacity: hoveredCountry && !isHovered ? 0.55 : 1,
@@ -865,7 +853,7 @@ export const ScatterPlotMatrix = ({
         </ResponsiveContainer>
       </div>
     );
-  }, [activeAttributes, getScatterData, isBrushingEnabled, getLabel, getPointColor, handlePointClick, setHoveredCountry, hoveredCountry, tooltipStyle]);
+  }, [activeAttributes, getScatterData, isBrushingEnabled, getLabel, getPointColor, handlePointClick, setHoveredCountry, hoveredCountry, tooltipStyle, highlightedCountries]);
 
   const matrixContent = (fullscreen = false) => {
     // For 2x2, show normal scatter plot
