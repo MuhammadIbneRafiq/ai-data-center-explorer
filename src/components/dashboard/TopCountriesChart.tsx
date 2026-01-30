@@ -192,7 +192,6 @@ export const TopCountriesChart = ({
         const bValue = (b[sortBy] as number) ?? 0;
         return sortDirection === 'desc' ? bValue - aValue : aValue - bValue;
       })
-      .slice(0, 30)
       .map((c, index) => ({
         country: c,
         name: c.country,
@@ -372,7 +371,7 @@ export const TopCountriesChart = ({
             />
             <Bar
               dataKey="value"
-              radius={[0, 4, 4, 0]}
+              radius={0}
               onClick={(_, index) => {
                 const item = chartData[index];
                 if (item && onCountrySelect) onCountrySelect(item.country);
@@ -403,13 +402,13 @@ export const TopCountriesChart = ({
       <div className="flex items-center justify-between text-xs font-semibold">
         <span>{metricLabels[attribute] || String(attribute)}</span>
       </div>
-      <div className="h-56">
+      <div className="flex-1 min-h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={multiAttributeData}
             layout="vertical"
             margin={{ left: 16, right: 8, top: 4, bottom: 4 }}
-            barSize={18}
+            barSize={Math.max(8, Math.min(18, 400 / multiAttributeData.length))}
             onMouseMove={(state) => {
               const payload = state?.activePayload?.[0]?.payload as any;
               setHoveredCountry(payload?.country?.countryCode ?? null);
@@ -450,7 +449,7 @@ export const TopCountriesChart = ({
             <Bar
               dataKey={attribute as string}
               fill="hsl(var(--chart-1))"
-              radius={[0, 4, 4, 0]}
+              radius={0}
               onClick={(_, index) => {
                 const item = multiAttributeData[index];
                 if (item && onCountrySelect) onCountrySelect(item.country);
