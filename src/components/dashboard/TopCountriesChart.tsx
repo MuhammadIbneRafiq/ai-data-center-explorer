@@ -193,28 +193,43 @@ export const TopCountriesChart = memo(function TopCountriesChart({
   }, [withValues, metric, limit, highlightedCountries]);
 
   // Multi-attribute data for fullscreen mode
+  const hasSelection = highlightedCountries && highlightedCountries.size > 0;
+  
   const multiAttributeData = useMemo(() => {
     if (!isFullscreen) return [];
     
-    return data
-      .filter(c => selectedAttributes.every(attr => {
-        const val = c[attr];
-        return typeof val === 'number' && !isNaN(val);
-      }))
-      .sort((a, b) => {
-        const aValue = (a[sortBy] as number) ?? 0;
-        const bValue = (b[sortBy] as number) ?? 0;
-        return sortDirection === 'desc' ? bValue - aValue : aValue - bValue;
-      })
-      .map((c, index) => ({
-        country: c,
-        name: c.country,
-        ...Object.fromEntries(
-          selectedAttributes.map(attr => [attr, c[attr] as number])
-        ),
-        index,
-      }));
-  }, [data, isFullscreen, sortBy, sortDirection, selectedAttributes]);
+    const withAllAttributes = data.filter(c => selectedAttributes.every(attr => {
+      const val = c[attr];
+      return typeof val === 'number' && !isNaN(val);
+    }));
+    
+    // Separate highlighted and non-highlighted countries
+    const highlighted = withAllAttributes.filter(c => highlightedCountries?.has(c.countryCode));
+    const nonHighlighted = withAllAttributes.filter(c => !highlightedCountries?.has(c.countryCode));
+    
+    // Sort each group
+    const sortFn = (a: CountryData, b: CountryData) => {
+      const aValue = (a[sortBy] as number) ?? 0;
+      const bValue = (b[sortBy] as number) ?? 0;
+      return sortDirection === 'desc' ? bValue - aValue : aValue - bValue;
+    };
+    
+    highlighted.sort(sortFn);
+    nonHighlighted.sort(sortFn);
+    
+    // Combine: highlighted first, then others
+    const combined = hasSelection ? [...highlighted, ...nonHighlighted] : withAllAttributes.sort(sortFn);
+    
+    return combined.map((c, index) => ({
+      country: c,
+      name: c.country,
+      ...Object.fromEntries(
+        selectedAttributes.map(attr => [attr, c[attr] as number])
+      ),
+      index,
+      isHighlighted: highlightedCountries?.has(c.countryCode) || false,
+    }));
+  }, [data, isFullscreen, sortBy, sortDirection, selectedAttributes, highlightedCountries, hasSelection]);
 
   const handleSort = (attribute: keyof CountryData) => {
     if (sortBy === attribute) {
@@ -292,7 +307,6 @@ export const TopCountriesChart = memo(function TopCountriesChart({
   };
 
   const selectedIndices = getSelectedIndices();
-  const hasSelection = highlightedCountries && highlightedCountries.size > 0;
 
   // Color palette matching radar plot
   const colorPalette = [
@@ -339,7 +353,7 @@ export const TopCountriesChart = memo(function TopCountriesChart({
       return "hsl(var(--chart-2))";
     }
 
-    return "hsl(var(--chart-1))"; // Default color
+    return "hsl(var(--muted-foreground) / 0.5)"; // Default gray color for initial plots
   };
 
   const chartContent = (fullscreen = false) => {
@@ -491,25 +505,39 @@ export const TopCountriesChart = memo(function TopCountriesChart({
             />
             <Bar
               dataKey={attribute as string}
-              fill="hsl(var(--chart-1))"
+              fill="hsl(var(--muted-foreground) / 0.5)"
               radius={0}
               onClick={(_, index) => {
                 const item = multiAttributeData[index];
                 if (item && onCountrySelect) onCountrySelect(item.country);
               }}
             >
-              {multiAttributeData.map((item) => (
-                <Cell
-                  key={item.country.countryCode}
-                  fill={hoveredCountry === item.country.countryCode ? "hsl(var(--chart-3))" : "hsl(var(--chart-1))"}
-                  style={{
-                    cursor: "pointer",
-                    transition: "transform 0.15s ease, opacity 0.15s ease",
-                    transform: hoveredCountry === item.country.countryCode ? "scale(1.04)" : "scale(1)",
-                    opacity: hoveredCountry && hoveredCountry !== item.country.countryCode ? 0.55 : 1,
-                  }}
-                />
-              ))}
+              {multiAttributeData.map((item) => {
+                const isHighlighted = item.isHighlighted;
+                const isHovered = hoveredCountry === item.country.countryCode;
+                
+                let fillColor = "hsl(var(--muted-foreground) / 0.5)";
+                if (isHovered) {
+                  fillColor = "hsl(var(--chart-3))";
+                } else if (hasSelection) {
+                  fillColor = isHighlighted 
+                    ? colorPalette[getColorIndex(item.country.countryCode)]
+                    : "hsl(var(--muted-foreground) / 0.3)";
+                }
+                
+                return (
+                  <Cell
+                    key={item.country.countryCode}
+                    fill={fillColor}
+                    style={{
+                      cursor: "pointer",
+                      transition: "transform 0.15s ease, opacity 0.15s ease",
+                      transform: isHovered ? "scale(1.04)" : "scale(1)",
+                      opacity: hoveredCountry && !isHovered ? 0.55 : 1,
+                    }}
+                  />
+                );
+              })}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
