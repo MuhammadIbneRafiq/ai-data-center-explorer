@@ -15,24 +15,24 @@ const tutorialSteps: TutorialStep[] = [
     description: "This interactive visualization helps potential investors identify optimal locations for building AI data centers based on comprehensive country-level metrics from the CIA World Factbook.",
   },
   {
-    title: "Interactive World Map",
-    description: "Click on any country to view detailed information. Countries are color-coded based on the selected metric. The map uses full country polygons for better visualization and supports zoom and pan.",
+    title: "Scatter Plot Matrix (SPLOM)",
+    description: "Explore correlations between multiple attributes. Use the brush tool to draw a lasso selection around points - this highlights matching countries across all views. Toggle between 2x2, 3x3, and 4x4 matrix sizes. Enable log scales for better distribution visualization.",
   },
   {
     title: "Parallel Coordinates Plot",
-    description: "Compare multiple attributes simultaneously. Click and drag on the axes to reorder them. Click on lines to highlight specific countries. Use this to identify trade-offs between different factors.",
+    description: "Compare multiple attributes simultaneously. Drag axes to reorder them. Click on lines to select countries. Use the multi-select button to build selections. Drag axis endpoints to rescale individual axes.",
   },
   {
     title: "Filter Panel",
-    description: "Use the left sidebar to filter countries based on various criteria. Selected countries will be highlighted in a distinct color while others fade to gray for easy comparison.",
+    description: "Use the left sidebar to filter countries by electricity cost, temperature, GDP, internet speed, and CO₂ emissions. The scented widgets show data distribution. Select specific countries from the country list tab.",
   },
   {
-    title: "Visualization Tasks",
-    description: "The dashboard addresses three key questions: Accessibility (infrastructure, climate, connectivity), Profitability (economic indicators, workforce), and Efficiency (energy systems, environmental impact).",
+    title: "Linking & Brushing",
+    description: "All visualizations are linked: hover over any element to highlight that country everywhere. Use the brush tool in the SPLOM to draw polygon selections - selected points will be highlighted in the bar charts, radar plot, and parallel coordinates.",
   },
   {
-    title: "Interactive Features",
-    description: "Click on any chart element (bars, scatter points, parallel coordinate lines) to focus on that country across all visualizations. The map will automatically zoom to the selected country.",
+    title: "Bar Charts & Radar Plot",
+    description: "The top countries chart shows rankings for the selected metric. Click bars to select countries. The radar plot compares selected countries across multiple dimensions simultaneously.",
   },
 ];
 

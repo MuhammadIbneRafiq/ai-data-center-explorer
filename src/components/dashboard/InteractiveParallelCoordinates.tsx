@@ -519,22 +519,32 @@ export const InteractiveParallelCoordinates = ({
             })}
 
             {/* Draw lines for each country */}
-            {normalizedData.map(({ country, normalized }) => (
-              <path
-                key={country.countryCode}
-                d={generatePath(normalized)}
-                fill="none"
-                stroke={getLineColor(country.countryCode)}
-                strokeWidth={getLineWidth(country.countryCode)}
-                opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
-                onMouseEnter={() => setHoveredCountry(country.countryCode)}
-                onMouseLeave={() => setHoveredCountry(null)}
-                onClick={() => handleLineClick(country)}
-                style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-              >
-                <title>{country.country}</title>
-              </path>
-            ))}
+            {normalizedData.map(({ country, normalized }) => {
+              // Generate path using local axisPositions for fullscreen
+              const pathPoints = selectedAttributes.map((attr, i) => {
+                const x = axisPositions[i];
+                const y = height * (1 - normalized[attr.key]);
+                return `${x},${y}`;
+              });
+              const pathD = `M ${pathPoints.join(' L ')}`;
+              
+              return (
+                <path
+                  key={country.countryCode}
+                  d={pathD}
+                  fill="none"
+                  stroke={getLineColor(country.countryCode)}
+                  strokeWidth={getLineWidth(country.countryCode)}
+                  opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
+                  onMouseEnter={() => setHoveredCountry(country.countryCode)}
+                  onMouseLeave={() => setHoveredCountry(null)}
+                  onClick={() => handleLineClick(country)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <title>{country.country}</title>
+                </path>
+              );
+            })}
           </g>
         </svg>
     </div>
@@ -560,28 +570,6 @@ export const InteractiveParallelCoordinates = ({
             >
               <MousePointer2 className="h-3 w-3" />
             </Button>
-            <Button
-              variant={pcpVariant === 'flexible' ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPcpVariant(pcpVariant === 'standard' ? 'flexible' : 'standard')}
-              className="h-6 text-xs px-2"
-              title="Toggle Flexible PCP"
-            >
-              <GitBranch className="h-3 w-3 mr-1" />
-              {pcpVariant === 'standard' ? 'Linear' : 'Flexible'}
-            </Button>
-            {isFullscreen && (
-              <Button
-                variant={fisheyeEnabled ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFisheyeEnabled(!fisheyeEnabled)}
-                className="h-6 text-xs px-2"
-                title="Toggle Fisheye Magnification"
-              >
-                <Search className="h-3 w-3 mr-1" />
-                Fisheye
-              </Button>
-            )}
             <Select onValueChange={addAttribute}>
               <SelectTrigger className="w-[100px] h-6 text-xs">
                 <SelectValue placeholder="Add..." />

@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback, memo, useRef } from "react";
+import { useState, useMemo, useCallback, memo, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceArea, BarChart, Bar } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { X, Grid2X2, Grid3X3, Grid, Maximize2, BarChart3 } from "lucide-react";
+import { X, Grid2X2, Grid3X3, Grid, Maximize2, BarChart3, Focus, Search } from "lucide-react";
 import { FullscreenOverlay } from "./FullscreenOverlay";
 
 // Define histogram bin data interface for TypeScript
@@ -89,7 +89,7 @@ export const ScatterPlotMatrix = ({
   highlightedCountries,
   onBrushSelection,
   brushEnabled = true,
-  brushMode = "select",
+  brushMode: propBrushMode = "select",
   zoomLevel = 1,
   onZoomChange,
 }: ScatterPlotMatrixProps) => {
@@ -108,8 +108,17 @@ export const ScatterPlotMatrix = ({
   // Brush state for drag-select brushing
   const [brushingCell, setBrushingCell] = useState<string | null>(null);
   const [brushStart, setBrushStart] = useState<{ x: number; y: number } | null>(null);
+  const [localBrushMode, setLocalBrushMode] = useState<"select" | "hover">(propBrushMode);
   const [brushEnd, setBrushEnd] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusLens, setFocusLens] = useState<{ x: number; y: number } | null>(null);
+  
+  // Lasso brush state - array of points forming the polygon
+  const [lassoPoints, setLassoPoints] = useState<{ x: number; y: number; screenX: number; screenY: number }[]>([]);
+  const [isLassoing, setIsLassoing] = useState(false);
+  const [lassoCell, setLassoCell] = useState<{ key: string; xAttr: keyof CountryData; yAttr: keyof CountryData } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   // Brushing is available for matrix layouts (3x3, 4x4) when enabled
   const isBrushingEnabled = brushEnabled && matrixSize !== "2x2";
   // Track currently selected cell for zooming
@@ -118,6 +127,76 @@ export const ScatterPlotMatrix = ({
   const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   // For throttling brush operations
   const lastBrushTime = useRef<number>(0);
+  
+  // Point-in-polygon algorithm (ray casting)
+  const pointInPolygon = useCallback((point: { x: number; y: number }, polygon: { x: number; y: number }[]) => {
+    if (polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      if (((yi > point.y) !== (yj > point.y)) &&
+          (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }, []);
+
+  // Get attribute config for log scale information
+  const getAttributeConfig = (key: keyof CountryData) => {
+    return attributeOptions.find(attr => attr.key === key) || { key, label: String(key) };
+  };
+
+  // Handle lasso selection - select all points inside the polygon
+  const handleLassoSelect = useCallback(() => {
+    if (!onBrushSelection || !lassoCell || lassoPoints.length < 3) return;
+    
+    const { xAttr, yAttr } = lassoCell;
+    const selectedCodes = new Set<string>();
+    
+    // Convert lasso points to data coordinates for comparison
+    const lassoDataCoords = lassoPoints.map(p => ({ x: p.x, y: p.y }));
+    
+    data.forEach(country => {
+      let xVal = country[xAttr] as number;
+      let yVal = country[yAttr] as number;
+      
+      if (typeof xVal !== "number" || typeof yVal !== "number" || isNaN(xVal) || isNaN(yVal)) return;
+      
+      // Apply log transformation if needed
+      if (useLogScales && getAttributeConfig(xAttr).useLogScale && xVal > 0) {
+        xVal = Math.log10(xVal);
+      }
+      if (useLogScales && getAttributeConfig(yAttr).useLogScale && yVal > 0) {
+        yVal = Math.log10(yVal);
+      }
+      
+      if (pointInPolygon({ x: xVal, y: yVal }, lassoDataCoords)) {
+        selectedCodes.add(country.countryCode);
+      }
+    });
+    
+    onBrushSelection(selectedCodes);
+  }, [data, lassoCell, lassoPoints, onBrushSelection, pointInPolygon, useLogScales, getAttributeConfig]);
+  
+  // Global mouse up handler to complete lasso when mouse released anywhere
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isLassoing && lassoPoints.length >= 3 && lassoCell) {
+        // Trigger selection
+        handleLassoSelect();
+      }
+      setIsLassoing(false);
+      setLassoPoints([]);
+      setLassoCell(null);
+    };
+    
+    if (isLassoing) {
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+  }, [isLassoing, lassoPoints.length, lassoCell, handleLassoSelect]);
   
   // Register cell ref for zooming
   const registerCellRef = useCallback((el: HTMLDivElement | null, key: string) => {
@@ -173,7 +252,7 @@ export const ScatterPlotMatrix = ({
     "hsl(var(--chart-5))", 
     "hsl(var(--chart-6))", 
     "hsl(var(--chart-7))", 
-    "hsl(var(--chart-8))"
+    "hsl(var(--chart-8))",
   ];
 
   // Get color index for a country
@@ -189,17 +268,18 @@ export const ScatterPlotMatrix = ({
   };
   
   const getPointColor = (countryCode: string) => {
-    const blue = "#3b82f6"; // explicit blue
-    const blueMuted = "#3b82f6" + "33"; // 20% opacity
-    if (activeCountry && activeCountry.countryCode === countryCode) {
-      return blue;
-    }
+    // Use consistent colors matching radar plot
     if (highlightedCountries && highlightedCountries.size > 0) {
-      return highlightedCountries.has(countryCode)
-        ? blue
-        : blueMuted;
+      if (highlightedCountries.has(countryCode)) {
+        const index = getColorIndex(countryCode);
+        return colorPalette[index];
+      }
+      return "#94a3b8"; // Muted gray for non-highlighted
     }
-    return blue;
+    if (activeCountry && activeCountry.countryCode === countryCode) {
+      return "#3b82f6"; // Blue for active
+    }
+    return "#64748b"; // Default gray
   };
 
   const handlePointClick = (country: CountryData) => {
@@ -215,11 +295,6 @@ export const ScatterPlotMatrix = ({
   };
 
   const hasSelection = highlightedCountries && highlightedCountries.size > 0;
-
-  // Get attribute config for log scale information
-  const getAttributeConfig = (key: keyof CountryData) => {
-    return attributeOptions.find(attr => attr.key === key) || { key, label: String(key) };
-  };
 
   // Apply log transform if needed
   const transformValue = (value: number, useLog: boolean) => {
@@ -305,7 +380,7 @@ export const ScatterPlotMatrix = ({
     lastBrushTime.current = now;
     
     // Only update selection cell when in select mode (not hover)
-    if (brushMode === "select") {
+    if (localBrushMode === "select") {
       setSelectedCell(cellKey);
     }
     
@@ -344,8 +419,8 @@ export const ScatterPlotMatrix = ({
     brushedCountries.forEach(code => selectedCodes.add(code));
     
     onBrushSelection(selectedCodes);
-  }, [data, highlightedCountries, onBrushSelection, useLogScales, getAttributeConfig]);
-
+  }, [data, highlightedCountries, onBrushSelection, useLogScales, getAttributeConfig, localBrushMode]);
+  
   // Memoize matrix cells - use 100% height since parent is flex
   const renderMatrix = useMemo(() => {
     const cells: JSX.Element[] = [];
@@ -456,9 +531,9 @@ export const ScatterPlotMatrix = ({
                       }}
                       contentStyle={tooltipStyle}
                     />
-                    <Bar dataKey="count" fill="hsl(var(--muted-foreground) / 0.5)" />
+                    <Bar dataKey="count" fill="hsl(var(--muted-foreground) / 0.5)" radius={0} />
                     {highlightedData.length > 0 && (
-                      <Bar dataKey="highlighted" fill="hsl(var(--chart-3))" />
+                      <Bar dataKey="highlighted" fill="hsl(var(--chart-3))" radius={0} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -479,46 +554,76 @@ export const ScatterPlotMatrix = ({
             <div
               key={cellKey}
               ref={(el) => registerCellRef(el, cellKey)}
-              className={`relative h-full ${isZoomed ? 'ring-2 ring-primary' : ''}`}
+              className={`relative h-full ${isZoomed ? 'ring-2 ring-primary' : ''} ${focusMode ? 'cursor-zoom-in' : ''}`}
               style={{
                 transform: isZoomed ? `scale(${cellScale})` : 'none',
                 zIndex: isZoomed ? 10 : 'auto',
-                transition: 'transform 0.3s ease'
+                transition: 'none'
               }}
               onClick={() => handleCellClick(cellKey)}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart 
                   margin={{ top: 2, right: 2, bottom: 2, left: 2 }}
-                  onMouseDown={(e) => {
-                    if (e?.xValue !== undefined && e?.yValue !== undefined) {
-                      setBrushingCell(cellKey);
-                      setBrushStart({ x: e.xValue, y: e.yValue });
-                      setBrushEnd({ x: e.xValue, y: e.yValue });
-                      setIsDragging(true);
+                  onMouseDown={(e, event) => {
+                    if (!isBrushingEnabled || e?.xValue === undefined || e?.yValue === undefined) return;
+                    setBrushingCell(cellKey);
+                    setBrushStart({ x: e.xValue, y: e.yValue });
+                    setBrushEnd({ x: e.xValue, y: e.yValue });
+                    setIsDragging(true);
+                    const nativeEvent = event?.nativeEvent as MouseEvent | undefined;
+                    if (focusMode && nativeEvent) {
+                      setFocusLens({ x: nativeEvent.offsetX, y: nativeEvent.offsetY });
                     }
                   }}
-                  onMouseMove={(e) => {
-                    if (isDragging && isBrushingThisCell && brushStart && e?.xValue !== undefined && e?.yValue !== undefined) {
+                  onMouseMove={(e, event) => {
+                    if (!isBrushingEnabled) return;
+                    const nativeEvent = event?.nativeEvent as MouseEvent | undefined;
+                    if (focusMode && nativeEvent) {
+                      setFocusLens({ x: nativeEvent.offsetX, y: nativeEvent.offsetY });
+                    }
+                    if ((localBrushMode === "hover" || focusMode) && !isDragging && e?.xValue !== undefined && e?.yValue !== undefined) {
+                      const dataPoints = getScatterData(xAttr, yAttr);
+                      if (dataPoints.length > 0) {
+                        const xValues = dataPoints.map(d => d.x);
+                        const yValues = dataPoints.map(d => d.y);
+                        const xMin = Math.min(...xValues);
+                        const xMax = Math.max(...xValues);
+                        const yMin = Math.min(...yValues);
+                        const yMax = Math.max(...yValues);
+                        const xBoxSize = (xMax - xMin) * 0.05;
+                        const yBoxSize = (yMax - yMin) * 0.05;
+                        handleBrushSelect(
+                          cellKey,
+                          xAttr,
+                          yAttr,
+                          e.xValue - xBoxSize,
+                          e.yValue - yBoxSize,
+                          e.xValue + xBoxSize,
+                          e.yValue + yBoxSize
+                        );
+                      }
+                    }
+                    if (isDragging && brushingCell === cellKey && brushStart && e?.xValue !== undefined && e?.yValue !== undefined) {
                       setBrushEnd({ x: e.xValue, y: e.yValue });
+                      handleBrushSelect(cellKey, xAttr, yAttr, brushStart.x, brushStart.y, e.xValue, e.yValue);
                     }
                   }}
                   onMouseUp={() => {
-                    if (isDragging && isBrushingThisCell && brushStart && brushEnd) {
+                    if (isDragging && brushingCell === cellKey && brushStart && brushEnd) {
                       handleBrushSelect(cellKey, xAttr, yAttr, brushStart.x, brushStart.y, brushEnd.x, brushEnd.y);
-                      setBrushingCell(null);
-                      setBrushStart(null);
-                      setBrushEnd(null);
-                      setIsDragging(false);
                     }
+                    setIsDragging(false);
+                    setBrushingCell(null);
+                    setBrushStart(null);
+                    setBrushEnd(null);
                   }}
                   onMouseLeave={() => {
-                    if (isBrushingThisCell) {
-                      setBrushingCell(null);
-                      setBrushStart(null);
-                      setBrushEnd(null);
-                      setIsDragging(false);
-                    }
+                    setIsDragging(false);
+                    setBrushingCell(null);
+                    setBrushStart(null);
+                    setBrushEnd(null);
+                    if (focusMode) setFocusLens(null);
                   }}
                 >
                   <XAxis
@@ -563,46 +668,53 @@ export const ScatterPlotMatrix = ({
                   {/* Brush selection rectangle */}
                   {isBrushingEnabled && isBrushingThisCell && renderReferenceArea}
                   
-                  <Tooltip
-                    cursor={{ strokeDasharray: "3 3" }}
-                    contentStyle={tooltipStyle}
-                    content={(props) => {
-                      if (!props.active || !props.payload?.[0]) return null;
-                      const point = props.payload[0].payload;
-                      return (
-                        <div className="bg-popover border rounded-lg p-2 shadow-lg">
-                          <p className="font-semibold text-sm">{point.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {getLabel(xAttr)}: {point.originalX.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {getLabel(yAttr)}: {point.originalY.toFixed(2)}
-                          </p>
-                        </div>
-                      );
-                    }}
-                  />
+                  {!focusMode && (
+                    <Tooltip
+                      cursor={{ strokeDasharray: "3 3" }}
+                      contentStyle={tooltipStyle}
+                      content={(props) => {
+                        if (!props.active || !props.payload?.[0]) return null;
+                        const point = props.payload[0].payload;
+                        return (
+                          <div className="bg-popover border rounded-lg p-3 shadow-lg">
+                            <p className="font-semibold text-sm mb-2">{point.name}</p>
+                            <div className="space-y-1">
+                              <p className="text-xs">
+                                <span className="font-medium">{getLabel(xAttr)}:</span>{' '}
+                                <span className="text-muted-foreground">{point.originalX.toFixed(2)}</span>
+                              </p>
+                              <p className="text-xs">
+                                <span className="font-medium">{getLabel(yAttr)}:</span>{' '}
+                                <span className="text-muted-foreground">{point.originalY.toFixed(2)}</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                  )}
                   <Scatter
                     data={scatterData}
                     fill="#3b82f6"
-                    stroke="#3b82f6"
+                    stroke="none"
                     onClick={(data) => {
                       const entry = data as typeof scatterData[0];
                       if (entry?.country) handlePointClick(entry.country);
                     }}
                   >
                     {scatterData.map((entry) => {
-                      // Base radius depends on matrix size - smaller for larger matrices
-                      const baseR = matrixSize === "3x3" ? 0.9 : matrixSize === "2x2" ? 1.4 : 0.9;
+                      // Base radius - larger for better visibility in 3x3
+                      const baseR = matrixSize === "3x3" ? 0.25 : matrixSize === "2x2" ? 0.3 : 0.15;
                       const isHovered = hoveredCountry === entry.country.countryCode;
                       const isHighlighted = highlightedCountries?.has(entry.country.countryCode);
                       
-                      // Semantic zoom: Add more detail when cell is zoomed
-                      // - Larger points
-                      // - Labels for highlighted or hovered points
-                      // - Stroke outlines 
-                      const zoomedCell = isZoomed || cellScale > 1;
-                      const semanticR = zoomedCell ? baseR * 1.1 : baseR;
+                      // Focus mode: magnify selected points
+                      let finalR = baseR;
+                      if (focusMode && isHighlighted) {
+                        finalR = baseR * 3; // Much larger in focus mode
+                      } else if (isZoomed || cellScale > 1) {
+                        finalR = baseR * 1.2;
+                      }
                       
                       return (
                         <g key={entry.country.countryCode}>
@@ -616,20 +728,20 @@ export const ScatterPlotMatrix = ({
                               stroke: "none",
                               strokeWidth: 0,
                             }}
-                            r={isHovered ? semanticR * 1.05 : semanticR}
+                            r={isHovered ? finalR * 1.2 : finalR}
                           />
                           
-                          {/* Show labels when zoomed in and point is highlighted or hovered */}
-                          {zoomedCell && (isHighlighted || isHovered) && (
+                          {/* Show labels in focus mode for highlighted points */}
+                          {focusMode && isHighlighted && (
                             <text 
                               x={entry.x} 
-                              y={entry.y - semanticR - 2}
+                              y={entry.y - finalR - 2}
                               textAnchor="middle"
-                              fill={isHovered ? "hsl(var(--primary))" : "hsl(var(--foreground))"}
-                              style={{ fontSize: semanticR * 2, fontWeight: isHovered ? "bold" : "normal" }}
+                              fill={getPointColor(entry.country.countryCode)}
+                              style={{ fontSize: 8, fontWeight: "bold" }}
                               pointerEvents="none"
                             >
-                              {entry.country.country.slice(0, 6)}
+                              {entry.country.country.slice(0, 8)}
                             </text>
                           )}
                         </g>
@@ -639,9 +751,26 @@ export const ScatterPlotMatrix = ({
                 </ScatterChart>
               </ResponsiveContainer>
               
-              {/* Brush mode overlay indicator */}
+              {/* Focus lens overlay */}
+              {focusMode && focusLens && (
+                <div
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: focusLens.x - 30,
+                    top: focusLens.y - 30,
+                    width: 60,
+                    height: 60,
+                    borderRadius: '9999px',
+                    border: '2px solid hsl(var(--primary))',
+                    boxShadow: '0 0 0 6px rgba(59,130,246,0.1)',
+                    background: 'radial-gradient(circle at 30% 30%, rgba(59,130,246,0.08), rgba(59,130,246,0.02))'
+                  }}
+                />
+              )}
+              
+              {/* Brush mode indicator */}
               {isBrushingEnabled && (
-                <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-primary/30 rounded" />
+                <div className="absolute inset-0 pointer-events-none border border-dashed border-primary/15 rounded" />
               )}
             </div>
           );
@@ -649,7 +778,7 @@ export const ScatterPlotMatrix = ({
       }
     }
     return cells;
-  }, [gridSize, activeAttributes, useLogScales, data.length, brushMode, brushingCell, brushStart, brushEnd, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick]);
+  }, [gridSize, activeAttributes, useLogScales, data.length, localBrushMode, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick, isLassoing, lassoCell, lassoPoints, isBrushingEnabled, handleLassoSelect, focusMode, getColorIndex, colorPalette, getPointColor, handleBrushSelect]);
 
   // Render normal scatter plot for 2x2
   const renderNormalScatter = useMemo(() => {
@@ -689,8 +818,25 @@ export const ScatterPlotMatrix = ({
             <Tooltip
               cursor={{ strokeDasharray: "3 3" }}
               contentStyle={tooltipStyle}
-              formatter={(value: number) => [value.toFixed(2)]}
-              labelFormatter={(_, payload) => payload[0]?.payload?.name || ""}
+              content={(props) => {
+                if (!props.active || !props.payload?.[0]) return null;
+                const point = props.payload[0].payload;
+                return (
+                  <div className="bg-popover border rounded-lg p-3 shadow-lg">
+                    <p className="font-semibold text-sm mb-2">{point.name}</p>
+                    <div className="space-y-1">
+                      <p className="text-xs">
+                        <span className="font-medium">{getLabel(xAttr)}:</span>{' '}
+                        <span className="text-muted-foreground">{point.originalX.toFixed(2)}</span>
+                      </p>
+                      <p className="text-xs">
+                        <span className="font-medium">{getLabel(yAttr)}:</span>{' '}
+                        <span className="text-muted-foreground">{point.originalY.toFixed(2)}</span>
+                      </p>
+                    </div>
+                  </div>
+                );
+              }}
             />
             <Scatter
               data={scatterData}
@@ -713,7 +859,7 @@ export const ScatterPlotMatrix = ({
                       cursor: isBrushingEnabled ? "crosshair" : "pointer",
                       opacity: hoveredCountry && !isHovered ? 0.55 : 1,
                     }}
-                    r={isHovered ? 2.2 : 1.8}
+                    r={isHovered ? 1.2 : 0.8}
                   />
                 );
               })}
@@ -762,6 +908,17 @@ export const ScatterPlotMatrix = ({
               </Button>
             </div>
             <div className="flex items-center gap-1">
+              {/* Focus mode toggle */}
+              <Button
+                variant={focusMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFocusMode(!focusMode)}
+                className="h-6 text-xs px-2"
+                title="Focus Mode - Magnify and highlight selected points"
+              >
+                <Focus className="h-3 w-3 mr-1" />Focus
+              </Button>
+              
               {/* Log scale toggle */}
               <Button
                 variant={useLogScales ? "default" : "outline"}

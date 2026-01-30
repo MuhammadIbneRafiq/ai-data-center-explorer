@@ -73,7 +73,7 @@ export const ScoreBreakdown = ({ data }: ScoreBreakdownProps) => {
               }}
               formatter={(value: number) => [value.toFixed(2), 'Average Value']}
             />
-            <Bar dataKey="value" radius={[0, 8, 8, 0]}>
+            <Bar dataKey="value" radius={0}>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
