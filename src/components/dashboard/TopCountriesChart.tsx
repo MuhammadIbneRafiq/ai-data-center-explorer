@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceArea } from "recharts";
 import { Button } from "@/components/ui/button";
-import { X, Maximize2, ArrowUpDown } from "lucide-react";
+import { X, Maximize2, ArrowUpDown, Focus } from "lucide-react";
 import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface TopCountriesChartProps {
@@ -136,6 +136,10 @@ export const TopCountriesChart = ({
   const [brushEnd, setBrushEnd] = useState<number | null>(null);
   const [isBrushing, setIsBrushing] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+  
+  // Focus/Select mode state
+  const [localBrushMode, setLocalBrushMode] = useState<"select" | "hover">("select");
+  const [focusMode, setFocusMode] = useState(false);
 
   const withValues = data.filter((c) => {
     const value = c[metric];
@@ -239,7 +243,7 @@ export const TopCountriesChart = ({
   }, [brushStart, brushEnd, topCountries.length]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!chartRef.current) return;
+    if (!chartRef.current || localBrushMode !== "select" || focusMode) return;
     const rect = chartRef.current.getBoundingClientRect();
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     setBrushStart(y);
@@ -280,6 +284,24 @@ export const TopCountriesChart = ({
   const selectedIndices = getSelectedIndices();
   const hasSelection = highlightedCountries && highlightedCountries.size > 0;
 
+  // Color palette matching radar plot
+  const colorPalette = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))", 
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))"
+  ];
+  
+  const getColorIndex = (countryCode: string) => {
+    if (highlightedCountries) {
+      const codes = Array.from(highlightedCountries);
+      const index = codes.indexOf(countryCode);
+      return index % colorPalette.length;
+    }
+    return 0;
+  };
+
   // Determine bar color based on selection state
   const getBarColor = (countryCode: string, index: number) => {
     const isActive = activeCountry && activeCountry.countryCode === countryCode;
@@ -292,14 +314,14 @@ export const TopCountriesChart = ({
     if (isBrushing) {
       // During brushing, show preview of selection
       return selectedIndices.has(index)
-        ? "hsl(var(--chart-1))"
+        ? colorPalette[getColorIndex(countryCode)]
         : "hsl(var(--muted-foreground) / 0.3)";
     }
     
     if (hasSelection) {
-      // After brush is complete, use highlightedCountries
+      // After brush is complete, use highlightedCountries with consistent colors
       return highlightedCountries.has(countryCode)
-        ? "hsl(var(--chart-1))"
+        ? colorPalette[getColorIndex(countryCode)]
         : "hsl(var(--muted-foreground) / 0.3)";
     }
     
@@ -339,7 +361,15 @@ export const TopCountriesChart = ({
             margin={{ left: 80, right: 20, top: 10, bottom: 10 }}
             onMouseMove={(state) => {
               const payload = state?.activePayload?.[0]?.payload as any;
-              setHoveredCountry(payload?.country?.countryCode ?? null);
+              const countryCode = payload?.country?.countryCode ?? null;
+              setHoveredCountry(countryCode);
+              
+              // Focus/hover mode selection
+              if ((focusMode || localBrushMode === "hover") && countryCode && onBrushSelection) {
+                const newSelection = new Set<string>();
+                newSelection.add(countryCode);
+                onBrushSelection(newSelection);
+              }
             }}
           >
             <XAxis
@@ -485,6 +515,27 @@ export const TopCountriesChart = ({
                 <X className="h-3 w-3 mr-1" />{highlightedCountries.size}
               </Button>
             )}
+            {/* Brush mode toggle - Focus and Hover are the same */}
+            <div className="flex items-center border rounded overflow-hidden">
+              <Button
+                variant={localBrushMode === "select" && !focusMode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setLocalBrushMode("select"); setFocusMode(false); }}
+                className="rounded-none px-2 h-6 text-xs"
+                title="Select Mode - Drag to select"
+              >
+                Select
+              </Button>
+              <Button
+                variant={localBrushMode === "hover" || focusMode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setLocalBrushMode("hover"); setFocusMode(true); }}
+                className="rounded-none px-2 h-6 text-xs"
+                title="Focus Mode - Highlight on hover"
+              >
+                <Focus className="h-3 w-3 mr-1" />Focus
+              </Button>
+            </div>
             <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(true)} className="h-6 w-6 p-0">
               <Maximize2 className="h-3 w-3" />
             </Button>

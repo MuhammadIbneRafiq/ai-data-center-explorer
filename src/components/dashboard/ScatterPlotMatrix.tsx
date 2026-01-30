@@ -703,8 +703,8 @@ export const ScatterPlotMatrix = ({
                     }}
                   >
                     {scatterData.map((entry) => {
-                      // Base radius - larger for better visibility in 3x3
-                      const baseR = matrixSize === "3x3" ? 0.25 : matrixSize === "2x2" ? 0.3 : 0.15;
+                      // Base radius - ULTRA tiny dots
+                      const baseR = matrixSize === "3x3" ? 0.001 : matrixSize === "2x2" ? 0.002 : 0.0008;
                       const isHovered = hoveredCountry === entry.country.countryCode;
                       const isHighlighted = highlightedCountries?.has(entry.country.countryCode);
                       
@@ -718,19 +718,16 @@ export const ScatterPlotMatrix = ({
                       
                       return (
                         <g key={entry.country.countryCode}>
-                          <Cell
-                            key={`cell-${entry.country.countryCode}`}
-                            fill={getPointColor(entry.country.countryCode)}
-                            style={{
-                              cursor: isBrushingEnabled ? "crosshair" : "pointer",
-                              opacity: hoveredCountry && !isHovered ? 0.55 : 1,
-                              filter: "none",
-                              stroke: "none",
-                              strokeWidth: 0,
-                            }}
+                          <circle
+                            cx={entry.x}
+                            cy={entry.y}
                             r={isHovered ? finalR * 1.2 : finalR}
+                            fill={isHighlighted ? getPointColor(entry.country.countryCode) : "#64748b"}
+                            fillOpacity={isHighlighted ? 1 : 0.6}
+                            stroke={isHovered ? "hsl(var(--primary))" : isHighlighted ? getPointColor(entry.country.countryCode) : "none"}
+                            strokeWidth={isHovered ? 1.5 : isHighlighted ? 0.5 : 0}
+                            cursor="pointer"
                           />
-                          
                           {/* Show labels in focus mode for highlighted points */}
                           {focusMode && isHighlighted && (
                             <text 

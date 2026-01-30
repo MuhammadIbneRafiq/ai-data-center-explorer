@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, MousePointer2, Maximize2, Search, GitBranch } from "lucide-react";
+import { X, MousePointer2, Maximize2, Search, GitBranch, Focus } from "lucide-react";
 import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface InteractiveParallelCoordinatesProps {
@@ -84,6 +84,10 @@ export const InteractiveParallelCoordinates = ({
   const [localSelection, setLocalSelection] = useState<Set<string>>(new Set());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Focus/Select mode state
+  const [localBrushMode, setLocalBrushMode] = useState<"select" | "hover">(brushMode);
+  const [focusMode, setFocusMode] = useState(false);
   
   // PCP variant: standard or flexible (radial)
   const [pcpVariant, setPcpVariant] = useState<'standard' | 'flexible'>('standard');
@@ -300,6 +304,7 @@ export const InteractiveParallelCoordinates = ({
 
   const getLineWidth = (countryCode: string) => {
     if (hoveredCountry === countryCode) return 3;
+    if (focusMode && effectiveSelection.has(countryCode)) return 4; // Thicker in focus mode
     if (effectiveSelection.has(countryCode)) return 2;
     if (selectedCountries && selectedCountries.some(c => c.countryCode === countryCode)) return 2;
     return 1;
@@ -536,9 +541,22 @@ export const InteractiveParallelCoordinates = ({
                   stroke={getLineColor(country.countryCode)}
                   strokeWidth={getLineWidth(country.countryCode)}
                   opacity={hoveredCountry && hoveredCountry !== country.countryCode ? 0.2 : 1}
-                  onMouseEnter={() => setHoveredCountry(country.countryCode)}
+                  onMouseEnter={() => {
+                    setHoveredCountry(country.countryCode);
+                    if (focusMode || localBrushMode === "hover") {
+                      const newSelection = new Set<string>();
+                      newSelection.add(country.countryCode);
+                      if (onMultiSelect) {
+                        onMultiSelect(newSelection);
+                      }
+                    }
+                  }}
                   onMouseLeave={() => setHoveredCountry(null)}
-                  onClick={() => handleLineClick(country)}
+                  onClick={() => {
+                    if (localBrushMode === "select" && !focusMode) {
+                      handleLineClick(country);
+                    }
+                  }}
                   style={{ cursor: 'pointer' }}
                 >
                   <title>{country.country}</title>
@@ -562,14 +580,27 @@ export const InteractiveParallelCoordinates = ({
                 <X className="h-3 w-3 mr-1" />{effectiveSelection.size}
               </Button>
             )}
-            <Button
-              variant={isMultiSelectMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
-              className="h-6 text-xs px-2"
-            >
-              <MousePointer2 className="h-3 w-3" />
-            </Button>
+            {/* Brush mode toggle - Focus and Hover are the same */}
+            <div className="flex items-center border rounded overflow-hidden">
+              <Button
+                variant={localBrushMode === "select" && !focusMode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setLocalBrushMode("select"); setFocusMode(false); }}
+                className="rounded-none px-2 h-6 text-xs"
+                title="Select Mode - Click to select"
+              >
+                Select
+              </Button>
+              <Button
+                variant={localBrushMode === "hover" || focusMode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setLocalBrushMode("hover"); setFocusMode(true); }}
+                className="rounded-none px-2 h-6 text-xs"
+                title="Focus Mode - Highlight on hover"
+              >
+                <Focus className="h-3 w-3 mr-1" />Focus
+              </Button>
+            </div>
             <Select onValueChange={addAttribute}>
               <SelectTrigger className="w-[100px] h-6 text-xs">
                 <SelectValue placeholder="Add..." />
