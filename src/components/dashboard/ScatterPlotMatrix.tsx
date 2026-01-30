@@ -487,7 +487,7 @@ export const ScatterPlotMatrix = ({
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart 
-                  margin={{ top: 2, right: 10, bottom: 24, left: 32 }}
+                  margin={{ top: 2, right: 2, bottom: 2, left: 2 }}
                   onMouseDown={(e) => {
                     if (e?.xValue !== undefined && e?.yValue !== undefined) {
                       setBrushingCell(cellKey);
@@ -532,7 +532,7 @@ export const ScatterPlotMatrix = ({
                       value: getLabel(xAttr) + 
                              (useLogScales && getAttributeConfig(xAttr).useLogScale ? ' (log10)' : ''),
                       position: "bottom",
-                      dy: 4,
+                      dy: 40,
                       fontSize: 9,
                       fill: "hsl(var(--foreground))",
                     } : undefined}
@@ -551,7 +551,7 @@ export const ScatterPlotMatrix = ({
                              (useLogScales && getAttributeConfig(yAttr).useLogScale ? ' (log10)' : ''),
                       angle: -90,
                       position: "left",
-                      dx: -28,
+                      dx: 40,
                       fontSize: 9,
                       fill: "hsl(var(--foreground))",
                     } : undefined}
