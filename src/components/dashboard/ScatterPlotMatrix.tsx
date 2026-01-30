@@ -115,6 +115,8 @@ export const ScatterPlotMatrix = ({
   const focusLensRef = useRef<{ x: number; y: number } | null>(null);
   const [focusLensState, setFocusLensState] = useState<{ x: number; y: number } | null>(null);
   const focusLensUpdateTimer = useRef<number | null>(null);
+  const [selectionLocked, setSelectionLocked] = useState(false);
+
   
   // Lasso brush state - array of points forming the polygon
   const [lassoPoints, setLassoPoints] = useState<{ x: number; y: number; screenX: number; screenY: number }[]>([]);
@@ -129,6 +131,9 @@ export const ScatterPlotMatrix = ({
   const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   // For throttling brush operations
   const lastBrushTime = useRef<number>(0);
+
+  const dragDistance = useRef(0);
+
   
   // Point-in-polygon algorithm (ray casting)
   const pointInPolygon = useCallback((point: { x: number; y: number }, polygon: { x: number; y: number }[]) => {
@@ -281,7 +286,7 @@ export const ScatterPlotMatrix = ({
     if (activeCountry && activeCountry.countryCode === countryCode) {
       return "#3b82f6"; // Blue for active
     }
-    return "#64748b"; // Default gray
+    return "#3b82f6"; // Default gray
   };
 
   const handlePointClick = (country: CountryData) => {
@@ -294,7 +299,22 @@ export const ScatterPlotMatrix = ({
     if (onBrushSelection) {
       onBrushSelection(new Set());
     }
+    setSelectionLocked(false);
   };
+
+  const getBasePointRadius = (matrixSize: MatrixSize) => {
+    switch (matrixSize) {
+      case "2x2":
+        return 2.2;
+      case "3x3":
+        return 1.1;
+      case "4x4":
+        return 0.85;
+      default:
+        return 1;
+    }
+  };
+
 
   const hasSelection = highlightedCountries && highlightedCountries.size > 0;
 
@@ -369,7 +389,14 @@ export const ScatterPlotMatrix = ({
   
   // Handle brush selection for a cell (hover-only, replace selection)
   const handleBrushSelect = useCallback((cellKey: string, xAttr: keyof CountryData, yAttr: keyof CountryData, x1: number, y1: number, x2: number, y2: number) => {
+    
+
     if (!onBrushSelection || !isBrushingEnabled) return;
+
+    // If selection is locked, do not update it via focus hover
+    if (focusMode && selectionLocked && !isDragging) {
+      return;
+    }
     
     // Skip intensive calculations if we have too many countries
     if (data.length > 500) {
@@ -425,6 +452,79 @@ export const ScatterPlotMatrix = ({
     onBrushSelection(selectedCodes);
   }, [data, highlightedCountries, onBrushSelection, useLogScales, getAttributeConfig, localBrushMode]);
   
+  const ScatterDot = ({
+    cx,
+    cy,
+    payload,
+  }: {
+    cx?: number;
+    cy?: number;
+    payload?: any;
+  }) => {
+    if (cx == null || cy == null || !payload) return null;
+
+    const countryCode = payload.country.countryCode;
+
+    const isHovered = hoveredCountry === countryCode;
+    const isHighlighted =
+      highlightedCountries?.has(countryCode) ||
+      activeCountry?.countryCode === countryCode;
+
+    const hasAnySelection =
+      (highlightedCountries && highlightedCountries.size > 0) ||
+      !!activeCountry;
+
+    // Base radius by matrix size
+    const baseR =
+      matrixSize === "2x2"
+        ? 5
+        : matrixSize === "3x3"
+          ? 3
+          : 2.5; // 4x4
+
+    let r = baseR;
+
+    // Focus mode magnification
+    if (focusMode && isHighlighted) {
+      r = baseR * 1.2;
+    }
+    // Zoomed cell magnification
+    else if (selectedCell) {
+      r = baseR * 1.2;
+    }
+
+    const fillOpacity =
+    // Hover always wins in select mode
+    (!focusMode && localBrushMode === "select" && isHovered)
+      ? 1
+      : hasAnySelection
+        ? isHighlighted ? 1 : 0.15
+        : 0.4;
+
+
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill={getPointColor(countryCode)}
+        fillOpacity={fillOpacity}
+        stroke={
+          isHovered
+            ? "#333"
+            : isHighlighted
+              ? getPointColor(countryCode)
+              : "none"
+        }
+        strokeWidth={
+          isHovered ? 1.5 : isHighlighted ? 0.5 : 0
+        }
+        style={{ cursor: "pointer" }}
+      />
+    );
+  };
+
+
   // Memoize matrix cells - use 100% height since parent is flex
   const renderMatrix = useMemo(() => {
     const cells: JSX.Element[] = [];
@@ -571,16 +671,22 @@ export const ScatterPlotMatrix = ({
                   margin={{ top: 2, right: 2, bottom: 2, left: 2 }}
                   onMouseDown={(e, event) => {
                     if (!isBrushingEnabled || e?.xValue === undefined || e?.yValue === undefined) return;
+
+                    dragDistance.current = 0; //  reset
+
                     setBrushingCell(cellKey);
                     setBrushStart({ x: e.xValue, y: e.yValue });
                     setBrushEnd({ x: e.xValue, y: e.yValue });
                     setIsDragging(true);
+
                     const nativeEvent = event?.nativeEvent as MouseEvent | undefined;
                     if (focusMode && nativeEvent) {
                       focusLensRef.current = { x: nativeEvent.offsetX, y: nativeEvent.offsetY };
                       setFocusLensState({ x: nativeEvent.offsetX, y: nativeEvent.offsetY });
                     }
+                    setSelectionLocked(false);
                   }}
+
                   onMouseMove={(e, event) => {
                     if (!isBrushingEnabled) return;
                     const nativeEvent = event?.nativeEvent as MouseEvent | undefined;
@@ -617,19 +723,45 @@ export const ScatterPlotMatrix = ({
                       }
                     }
                     if (isDragging && brushingCell === cellKey && brushStart && e?.xValue !== undefined && e?.yValue !== undefined) {
+                      dragDistance.current +=
+                        Math.abs(e.xValue - brushStart.x) +
+                        Math.abs(e.yValue - brushStart.y);
+
                       setBrushEnd({ x: e.xValue, y: e.yValue });
                       handleBrushSelect(cellKey, xAttr, yAttr, brushStart.x, brushStart.y, e.xValue, e.yValue);
                     }
+
                   }}
-                  onMouseUp={() => {
-                    if (isDragging && brushingCell === cellKey && brushStart && brushEnd) {
-                      handleBrushSelect(cellKey, xAttr, yAttr, brushStart.x, brushStart.y, brushEnd.x, brushEnd.y);
+                  onMouseUp={(e) => {
+                    if (!brushStart) return;
+
+                    // CLICK (not drag)
+                    if (dragDistance.current < 0.02) {
+                      const payload = e?.activePayload?.[0]?.payload;
+                      if (payload?.country) {
+                        handlePointClick(payload.country);
+                        setSelectionLocked(true);
+                      }
+                    } 
+                    // DRAG
+                    else if (brushEnd) {
+                      handleBrushSelect(
+                        cellKey,
+                        xAttr,
+                        yAttr,
+                        brushStart.x,
+                        brushStart.y,
+                        brushEnd.x,
+                        brushEnd.y
+                      );
                     }
+
                     setIsDragging(false);
                     setBrushingCell(null);
                     setBrushStart(null);
                     setBrushEnd(null);
                   }}
+
                   onMouseLeave={() => {
                     setIsDragging(false);
                     setBrushingCell(null);
@@ -710,44 +842,16 @@ export const ScatterPlotMatrix = ({
                       }}
                     />
                   )}
-                  <Scatter
-                    data={scatterData}
-                    fill="#3b82f6"
-                    stroke="none"
-                    onClick={(data) => {
-                      const entry = data as typeof scatterData[0];
-                      if (entry?.country) handlePointClick(entry.country);
-                    }}
-                  >
-                    {scatterData.map((entry) => {
-                      // Base radius - Even SMALLER dots for 3x3 and 4x4
-                      const baseR = matrixSize === "3x3" ? 0.0005 : matrixSize === "2x2" ? 0.002 : 0.0004;
-                      const isHovered = hoveredCountry === entry.country.countryCode;
-                      const isHighlighted = highlightedCountries?.has(entry.country.countryCode);
-                      
-                      // Focus mode: magnify selected points
-                      let finalR = baseR;
-                      if (focusMode && isHighlighted) {
-                        finalR = baseR * 3; // Much larger in focus mode
-                      } else if (isZoomed || cellScale > 1) {
-                        finalR = baseR * 1.2;
-                      }
-                      
-                      return (
-                        <Cell
-                          key={entry.country.countryCode}
-                          fill={isHighlighted ? getPointColor(entry.country.countryCode) : "#3b82f6"}
-                          fillOpacity={isHighlighted ? 0.5 : 0.3}
-                          stroke={isHovered ? "hsl(var(--primary))" : isHighlighted ? getPointColor(entry.country.countryCode) : "none"}
-                          strokeWidth={isHovered ? 1.5 : isHighlighted ? 0.5 : 0}
-                          r={isHovered ? finalR * 1.2 : finalR}
-                          style={{
-                            cursor: "pointer"
-                          }}
-                        />
-                      );
-                    })}
-                  </Scatter>
+                 <Scatter
+                  data={scatterData}
+                  shape={<ScatterDot />}
+                  onClick={(data) => {
+                    const entry = data as typeof scatterData[0];
+                    if (entry?.country) handlePointClick(entry.country);
+                    setSelectionLocked(true);
+                  }}
+                />
+
                 </ScatterChart>
               </ResponsiveContainer>
               
@@ -840,32 +944,14 @@ export const ScatterPlotMatrix = ({
             />
             <Scatter
               data={scatterData}
-              fill="#3b82f6"
-              stroke="#3b82f6"
+              shape={<ScatterDot />}
               onClick={(data) => {
-                if (!isBrushingEnabled) {
-                  const entry = data as typeof scatterData[0];
-                  if (entry?.country) handlePointClick(entry.country);
-                }
+                const entry = data as typeof scatterData[0];
+                if (entry?.country) handlePointClick(entry.country);
+                setSelectionLocked(true);
               }}
-            >
-              {scatterData.map((entry) => {
-                const isHovered = hoveredCountry === entry.country.countryCode;
-                const isHighlighted = highlightedCountries?.has(entry.country.countryCode);
-                return (
-                  <Cell
-                    key={entry.country.countryCode}
-                    fill={getPointColor(entry.country.countryCode)}
-                    fillOpacity={isHighlighted ? 0.7 : 0.4}
-                    style={{
-                      cursor: isBrushingEnabled ? "crosshair" : "pointer",
-                      opacity: hoveredCountry && !isHovered ? 0.55 : 1,
-                    }}
-                    r={isHovered ? 1.2 : 0.8}
-                  />
-                );
-              })}
-            </Scatter>
+            />
+
           </ScatterChart>
         </ResponsiveContainer>
       </div>
@@ -915,7 +1001,7 @@ export const ScatterPlotMatrix = ({
                 <Button
                   variant={localBrushMode === "select" && !focusMode ? "default" : "ghost"}
                   size="sm"
-                  onClick={() => { setLocalBrushMode("select"); setFocusMode(false); }}
+                  onClick={() => { setLocalBrushMode("select"); setFocusMode(false); setSelectionLocked(false);}}
                   className="rounded-none px-2 h-6 text-xs"
                   title="Select Mode - Drag to select points"
                 >
@@ -924,7 +1010,7 @@ export const ScatterPlotMatrix = ({
                 <Button
                   variant={localBrushMode === "hover" || focusMode ? "default" : "ghost"}
                   size="sm"
-                  onClick={() => { setLocalBrushMode("hover"); setFocusMode(true); }}
+                  onClick={() => { setLocalBrushMode("hover"); setFocusMode(true); setSelectionLocked(false); }}
                   className="rounded-none px-2 h-6 text-xs"
                   title="Focus/Hover Mode - Magnify and select on hover"
                 >
