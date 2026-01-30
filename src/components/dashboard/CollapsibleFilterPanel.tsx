@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -29,7 +29,7 @@ interface CollapsibleFilterPanelProps {
   children?: React.ReactNode;
 }
 
-export const CollapsibleFilterPanel = ({
+export const CollapsibleFilterPanel = memo(function CollapsibleFilterPanel({
   filters,
   onFiltersChange,
   countryData,
@@ -38,7 +38,7 @@ export const CollapsibleFilterPanel = ({
   isOpen: externalIsOpen,
   onToggle,
   children
-}: CollapsibleFilterPanelProps) => {
+}: CollapsibleFilterPanelProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(true);
   
   // Use external state if provided, otherwise use internal state
@@ -47,26 +47,36 @@ export const CollapsibleFilterPanel = ({
   const [countrySearch, setCountrySearch] = useState("");
   const [activeTab, setActiveTab] = useState<"range" | "countries">("range");
 
-  // Calculate data distributions for scented widgets
-  const getDataDistribution = (field: keyof CountryData, bins: number = 10) => {
-    const values = countryData
-      .map(c => c[field])
-      .filter((v): v is number => typeof v === "number" && !isNaN(v));
+  // Memoized data distributions for scented widgets
+  const dataDistributions = useMemo(() => {
+    const getDistribution = (field: keyof CountryData, bins: number = 10) => {
+      const values = countryData
+        .map(c => c[field])
+        .filter((v): v is number => typeof v === "number" && !isNaN(v));
+      
+      if (values.length === 0) return [];
+      
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const binSize = (max - min) / bins;
+      
+      const distribution = new Array(bins).fill(0);
+      values.forEach(v => {
+        const binIndex = Math.min(Math.floor((v - min) / binSize), bins - 1);
+        distribution[binIndex]++;
+      });
+      
+      return distribution;
+    };
     
-    if (values.length === 0) return [];
-    
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const binSize = (max - min) / bins;
-    
-    const distribution = new Array(bins).fill(0);
-    values.forEach(v => {
-      const binIndex = Math.min(Math.floor((v - min) / binSize), bins - 1);
-      distribution[binIndex]++;
-    });
-    
-    return distribution;
-  };
+    return {
+      electricity: getDistribution("electricity_capacity_per_capita"),
+      temp: getDistribution("Mean_Temp"),
+      gdp: getDistribution("Real_GDP_per_Capita_USD"),
+      internet: getDistribution("internet_users_per_100"),
+      co2: getDistribution("co2_per_capita_tonnes"),
+    };
+  }, [countryData]);
 
   // Scented widget component
   const ScentedWidget = ({ data, height = 20 }: { data: number[], height?: number }) => {
@@ -153,9 +163,13 @@ export const CollapsibleFilterPanel = ({
   return (
     <div
       className={cn(
-        "fixed left-0 top-0 h-full z-50 transition-transform duration-150 ease-in-out flex",
+        "fixed left-0 top-0 h-full z-50 flex",
         isOpen ? "translate-x-0" : "-translate-x-[calc(100%-40px)]"
       )}
+      style={{ 
+        transition: 'transform 100ms ease-out',
+        willChange: 'transform'
+      }}
     >
       {/* Filter panel */}
       <Card className="w-96 h-full rounded-none border-r shadow-lg bg-card">
@@ -230,7 +244,7 @@ export const CollapsibleFilterPanel = ({
                       ${(filters.electricityCost[0] / 100).toFixed(2)} - ${(filters.electricityCost[1] / 100).toFixed(2)}
                     </span>
                   </div>
-                  <ScentedWidget data={getDataDistribution("electricity_capacity_per_capita")} />
+                  <ScentedWidget data={dataDistributions.electricity} />
                   <Slider
                     value={filters.electricityCost}
                     onValueChange={(value) =>
@@ -265,7 +279,7 @@ export const CollapsibleFilterPanel = ({
                       {filters.temperature[0]}°C - {filters.temperature[1]}°C
                     </span>
                   </div>
-                  <ScentedWidget data={getDataDistribution("Mean_Temp")} />
+                  <ScentedWidget data={dataDistributions.temp} />
                   <Slider
                     value={filters.temperature}
                     onValueChange={(value) =>
@@ -300,7 +314,7 @@ export const CollapsibleFilterPanel = ({
                       ${filters.gdp[0].toLocaleString()} - ${filters.gdp[1].toLocaleString()}
                     </span>
                   </div>
-                  <ScentedWidget data={getDataDistribution("Real_GDP_per_Capita_USD")} />
+                  <ScentedWidget data={dataDistributions.gdp} />
                   <Slider
                     value={filters.gdp}
                     onValueChange={(value) =>
@@ -335,7 +349,7 @@ export const CollapsibleFilterPanel = ({
                       {filters.internetSpeed[0]} - {filters.internetSpeed[1]}
                     </span>
                   </div>
-                  <ScentedWidget data={getDataDistribution("internet_users_per_100")} />
+                  <ScentedWidget data={dataDistributions.internet} />
                   <Slider
                     value={filters.internetSpeed}
                     onValueChange={(value) =>
@@ -370,7 +384,7 @@ export const CollapsibleFilterPanel = ({
                       {filters.co2PerCapita[0]} - {filters.co2PerCapita[1]} tonnes
                     </span>
                   </div>
-                  <ScentedWidget data={getDataDistribution("co2_per_capita_tonnes")} />
+                  <ScentedWidget data={dataDistributions.co2} />
                   <Slider
                     value={filters.co2PerCapita}
                     onValueChange={(value) =>
@@ -543,4 +557,4 @@ export const CollapsibleFilterPanel = ({
       </button>
     </div>
   );
-};
+});

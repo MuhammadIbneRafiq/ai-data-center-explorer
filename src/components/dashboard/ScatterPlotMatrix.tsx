@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, memo, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceArea, BarChart, Bar } from "recharts";
@@ -112,15 +112,17 @@ export const ScatterPlotMatrix = ({
   const [brushEnd, setBrushEnd] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [focusLens, setFocusLens] = useState<{ x: number; y: number } | null>(null);
+  const focusLensRef = useRef<{ x: number; y: number } | null>(null);
+  const [focusLensState, setFocusLensState] = useState<{ x: number; y: number } | null>(null);
+  const focusLensUpdateTimer = useRef<number | null>(null);
   
   // Lasso brush state - array of points forming the polygon
   const [lassoPoints, setLassoPoints] = useState<{ x: number; y: number; screenX: number; screenY: number }[]>([]);
   const [isLassoing, setIsLassoing] = useState(false);
   const [lassoCell, setLassoCell] = useState<{ key: string; xAttr: keyof CountryData; yAttr: keyof CountryData } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Brushing is available for matrix layouts (3x3, 4x4) when enabled
-  const isBrushingEnabled = brushEnabled && matrixSize !== "2x2";
+  // Brushing is always available when enabled (removed 2x2 restriction)
+  const isBrushingEnabled = brushEnabled;
   // Track currently selected cell for zooming
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   // Ref for cell content to enable zooming
@@ -361,6 +363,8 @@ export const ScatterPlotMatrix = ({
     border: "1px solid hsl(var(--border))",
     borderRadius: "8px",
     fontSize: "12px",
+    color: "hsl(var(--foreground))",
+    padding: "8px 12px",
   }), []);
   
   // Handle brush selection for a cell (hover-only, replace selection)
@@ -374,9 +378,9 @@ export const ScatterPlotMatrix = ({
       if (Math.random() > sampleRate) return;
     }
     
-    // Skip brushing if it's happening too frequently
+    // Skip brushing if it's happening too frequently - increased to 100ms for better performance
     const now = Date.now();
-    if (now - lastBrushTime.current < 20) return; // Limit to ~50fps
+    if (now - lastBrushTime.current < 100) return; // Limit to ~10fps for smoother experience
     lastBrushTime.current = now;
     
     // Only update selection cell when in select mode (not hover)
@@ -573,14 +577,22 @@ export const ScatterPlotMatrix = ({
                     setIsDragging(true);
                     const nativeEvent = event?.nativeEvent as MouseEvent | undefined;
                     if (focusMode && nativeEvent) {
-                      setFocusLens({ x: nativeEvent.offsetX, y: nativeEvent.offsetY });
+                      focusLensRef.current = { x: nativeEvent.offsetX, y: nativeEvent.offsetY };
+                      setFocusLensState({ x: nativeEvent.offsetX, y: nativeEvent.offsetY });
                     }
                   }}
                   onMouseMove={(e, event) => {
                     if (!isBrushingEnabled) return;
                     const nativeEvent = event?.nativeEvent as MouseEvent | undefined;
                     if (focusMode && nativeEvent) {
-                      setFocusLens({ x: nativeEvent.offsetX, y: nativeEvent.offsetY });
+                      // Use ref + debounced state update for performance
+                      focusLensRef.current = { x: nativeEvent.offsetX, y: nativeEvent.offsetY };
+                      if (!focusLensUpdateTimer.current) {
+                        focusLensUpdateTimer.current = window.setTimeout(() => {
+                          setFocusLensState(focusLensRef.current);
+                          focusLensUpdateTimer.current = null;
+                        }, 50);
+                      }
                     }
                     if ((localBrushMode === "hover" || focusMode) && !isDragging && e?.xValue !== undefined && e?.yValue !== undefined) {
                       const dataPoints = getScatterData(xAttr, yAttr);
@@ -623,7 +635,10 @@ export const ScatterPlotMatrix = ({
                     setBrushingCell(null);
                     setBrushStart(null);
                     setBrushEnd(null);
-                    if (focusMode) setFocusLens(null);
+                    if (focusMode) {
+                      focusLensRef.current = null;
+                      setFocusLensState(null);
+                    }
                   }}
                 >
                   <XAxis
@@ -672,11 +687,13 @@ export const ScatterPlotMatrix = ({
                     <Tooltip
                       cursor={{ strokeDasharray: "3 3" }}
                       contentStyle={tooltipStyle}
+                      offset={20}
+                      position={{ x: undefined, y: undefined }}
                       content={(props) => {
                         if (!props.active || !props.payload?.[0]) return null;
                         const point = props.payload[0].payload;
                         return (
-                          <div className="bg-popover border rounded-lg p-3 shadow-lg">
+                          <div className="bg-popover border rounded-lg p-3 shadow-lg pointer-events-none" style={{ transform: 'translate(15px, -50%)' }}>
                             <p className="font-semibold text-sm mb-2">{point.name}</p>
                             <div className="space-y-1">
                               <p className="text-xs">
@@ -735,12 +752,12 @@ export const ScatterPlotMatrix = ({
               </ResponsiveContainer>
               
               {/* Focus lens overlay */}
-              {focusMode && focusLens && (
+              {focusMode && focusLensState && (
                 <div
                   className="pointer-events-none absolute"
                   style={{
-                    left: focusLens.x - 30,
-                    top: focusLens.y - 30,
+                    left: focusLensState.x - 30,
+                    top: focusLensState.y - 30,
                     width: 60,
                     height: 60,
                     borderRadius: '9999px',
@@ -761,7 +778,7 @@ export const ScatterPlotMatrix = ({
       }
     }
     return cells;
-  }, [gridSize, activeAttributes, useLogScales, data.length, localBrushMode, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick, isLassoing, lassoCell, lassoPoints, isBrushingEnabled, handleLassoSelect, focusMode, getColorIndex, colorPalette, getPointColor, handleBrushSelect, focusLens, getScatterData, matrixSize]);
+  }, [gridSize, activeAttributes, useLogScales, data.length, localBrushMode, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick, isLassoing, lassoCell, lassoPoints, isBrushingEnabled, handleLassoSelect, focusMode, getColorIndex, colorPalette, getPointColor, handleBrushSelect, focusLensState, getScatterData, matrixSize]);
 
   // Render normal scatter plot for 2x2
   const renderNormalScatter = useMemo(() => {
@@ -977,7 +994,34 @@ export const ScatterPlotMatrix = ({
       </Card>
       
       <FullscreenOverlay isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title="Scatter Plot Matrix">
-        {matrixContent(true)}
+        <div className="h-full flex flex-col">
+          {/* Legend for selected countries */}
+          {highlightedCountries && highlightedCountries.size > 0 && (
+            <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-lg flex-shrink-0">
+              <span className="text-xs font-semibold">Selected:</span>
+              <div className="flex flex-wrap gap-1">
+                {Array.from(highlightedCountries).slice(0, 8).map((code, index) => {
+                  const country = data.find(c => c.countryCode === code);
+                  return (
+                    <div key={code} className="flex items-center gap-1 bg-background rounded px-1.5 py-0.5">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: colorPalette[index % colorPalette.length] }}
+                      />
+                      <span className="text-[10px]">{country?.country || code}</span>
+                    </div>
+                  );
+                })}
+                {highlightedCountries.size > 8 && (
+                  <span className="text-[10px] text-muted-foreground">+{highlightedCountries.size - 8} more</span>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            {matrixContent(true)}
+          </div>
+        </div>
       </FullscreenOverlay>
     </>
   );

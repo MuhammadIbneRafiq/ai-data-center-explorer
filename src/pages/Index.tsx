@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { CollapsibleFilterPanel } from "@/components/dashboard/CollapsibleFilterPanel";
 import { TopCountriesChart } from "@/components/dashboard/TopCountriesChart";
@@ -44,7 +44,22 @@ const Index = () => {
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
   const [countryData, setCountryData] = useState<CountryData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [highlightedCountries, setHighlightedCountries] = useState<Set<string>>(new Set());
+  const [highlightedCountries, setHighlightedCountriesRaw] = useState<Set<string>>(new Set());
+  const highlightThrottleRef = useRef<number | null>(null);
+  const pendingHighlightRef = useRef<Set<string> | null>(null);
+  
+  // Throttled setter for highlightedCountries to prevent excessive re-renders
+  const setHighlightedCountries = useCallback((newSet: Set<string>) => {
+    pendingHighlightRef.current = newSet;
+    if (!highlightThrottleRef.current) {
+      highlightThrottleRef.current = window.setTimeout(() => {
+        if (pendingHighlightRef.current) {
+          setHighlightedCountriesRaw(pendingHighlightRef.current);
+        }
+        highlightThrottleRef.current = null;
+      }, 100); // 100ms throttle - more aggressive
+    }
+  }, []);
   const [compareCountries, setCompareCountries] = useState<CountryData[]>([]);
   const [showLegend, setShowLegend] = useState(false);
   // Brush and linking settings
@@ -113,7 +128,7 @@ const Index = () => {
     }
   };
 
-  const filteredData = countryData.filter((country) => {
+  const filteredData = useMemo(() => countryData.filter((country) => {
     // Filter by CO2 per capita
     if (
       country.co2_per_capita_tonnes !== undefined &&
@@ -164,7 +179,7 @@ const Index = () => {
     }
 
     return true;
-  });
+  }), [countryData, filters, sliceControls]);
 
   const handleSpiderCountrySelect = (
     country: CountryData,

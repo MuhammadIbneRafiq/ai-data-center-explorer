@@ -532,8 +532,9 @@ export const InteractiveParallelCoordinates = ({
   
   const parallelContent = (fullscreen = false) => {
     // Calculate dimensions based on whether we're in fullscreen
+    // Fullscreen uses more aggressive space usage
     const contentDimensions = fullscreen 
-      ? { width: window.innerWidth * 0.95, height: window.innerHeight * 0.85 }
+      ? { width: window.innerWidth - 60, height: window.innerHeight - 100 }
       : dimensions;
 
     // Recalculate layout dimensions for this content
@@ -1014,8 +1015,33 @@ export const InteractiveParallelCoordinates = ({
       </Card>
       
       <FullscreenOverlay isOpen={isFullscreen} onClose={() => setIsFullscreen(false)} title="Interactive Parallel Coordinates">
-        <div className="w-full h-full">
-          {parallelContent(true)}
+        <div className="w-full h-full flex flex-col">
+          {/* Legend for selected countries */}
+          {effectiveSelection.size > 0 && (
+            <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-lg flex-shrink-0">
+              <span className="text-xs font-semibold">Selected:</span>
+              <div className="flex flex-wrap gap-1">
+                {Array.from(effectiveSelection).slice(0, 8).map((code, index) => {
+                  const country = data.find(c => c.countryCode === code);
+                  return (
+                    <div key={code} className="flex items-center gap-1 bg-background rounded px-1.5 py-0.5">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: colorPalette[index % colorPalette.length] }}
+                      />
+                      <span className="text-[10px]">{country?.country || code}</span>
+                    </div>
+                  );
+                })}
+                {effectiveSelection.size > 8 && (
+                  <span className="text-[10px] text-muted-foreground">+{effectiveSelection.size - 8} more</span>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            {parallelContent(true)}
+          </div>
         </div>
       </FullscreenOverlay>
     </>

@@ -10,7 +10,7 @@ import {
 import { CountryData } from "@/types/country-data";
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { X, Maximize2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo } from "react";
 import { FullscreenOverlay } from "./FullscreenOverlay";
 
 interface SpiderChartProps {
@@ -54,7 +54,7 @@ const DEFAULT_COUNTRIES = ["UNITED STATES", "BANGLADESH", "FRANCE", "JAPAN", "CA
 // Invert these metrics (lower is better)
 const invertedMetrics = ["Unemployment_Rate_percent", "co2_per_gdp_tonnes_per_billion"];
 
-export const SpiderChart = ({
+const SpiderChartComponent = ({
   data,
   selectedCountry,
   compareCountries = [],
@@ -350,3 +350,5 @@ export const SpiderChart = ({
     </>
   );
 };
+
+export const SpiderChart = memo(SpiderChartComponent);

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { CountryData } from "@/types/country-data";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceArea } from "recharts";
@@ -112,7 +112,7 @@ const attributeOptions: Array<keyof CountryData> = [
   // No Z-score variants in this component
 ];
 
-export const TopCountriesChart = ({
+export const TopCountriesChart = memo(function TopCountriesChart({
   data,
   limit = 10,
   metric,
@@ -120,7 +120,7 @@ export const TopCountriesChart = ({
   onCountrySelect,
   highlightedCountries,
   onBrushSelection,
-}: TopCountriesChartProps) => {
+}: TopCountriesChartProps) {
   const metricLabel = metricLabels[metric] ?? String(metric);
   
   // Fullscreen state
@@ -128,6 +128,16 @@ export const TopCountriesChart = ({
   const [sortBy, setSortBy] = useState<keyof CountryData>(metric);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
+  const hoverThrottleRef = useRef<number | null>(null);
+  
+  // Throttled hover setter
+  const throttledSetHover = useCallback((code: string | null) => {
+    if (hoverThrottleRef.current) return;
+    setHoveredCountry(code);
+    hoverThrottleRef.current = window.setTimeout(() => {
+      hoverThrottleRef.current = null;
+    }, 30);
+  }, []);
   const [selectedAttributes, setSelectedAttributes] = useState<Array<keyof CountryData>>(defaultAttributes);
   const [attributeToAdd, setAttributeToAdd] = useState<keyof CountryData>(defaultAttributes[0]);
   
@@ -346,12 +356,15 @@ export const TopCountriesChart = ({
         {/* Brush selection overlay */}
         {isBrushing && brushStart !== null && brushEnd !== null && (
           <div
-            className="absolute left-0 right-0 bg-primary/20 border-y-2 border-primary pointer-events-none z-10"
+            className="absolute left-0 right-0 bg-primary/30 border-y-2 border-primary pointer-events-none z-10"
             style={{
               top: `${Math.min(brushStart, brushEnd)}%`,
               height: `${Math.abs(brushEnd - brushStart)}%`,
+              boxShadow: '0 0 10px hsla(var(--primary), 0.5)',
             }}
-          />
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10" />
+          </div>
         )}
         
         <ResponsiveContainer width="100%" height="100%">
@@ -546,6 +559,32 @@ export const TopCountriesChart = ({
       
       <FullscreenOverlay isOpen={isFullscreen} onClose={() => { setIsFullscreen(false); setHoveredCountry(null); }} title={`Top Countries - Multi-Attribute Comparison`}>
         <div className="h-full flex flex-col">
+          {/* Legend for selected countries */}
+          {hasSelection && (
+            <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-lg">
+              <span className="text-xs font-semibold">Selected:</span>
+              <div className="flex flex-wrap gap-1">
+                {Array.from(highlightedCountries).slice(0, 8).map((code, index) => {
+                  const country = data.find(c => c.countryCode === code);
+                  return (
+                    <div key={code} className="flex items-center gap-1 bg-background rounded px-1.5 py-0.5">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: colorPalette[index % colorPalette.length] }}
+                      />
+                      <span className="text-[10px]">{country?.country || code}</span>
+                    </div>
+                  );
+                })}
+                {highlightedCountries.size > 8 && (
+                  <span className="text-[10px] text-muted-foreground">+{highlightedCountries.size - 8} more</span>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleClearSelection} className="h-5 text-[10px] px-1 ml-auto">
+                Clear
+              </Button>
+            </div>
+          )}
           {/* Sortable attribute buttons */}
           <div className="flex gap-2 mb-2 flex-wrap">
             {selectedAttributes.map(attr => (
@@ -570,4 +609,4 @@ export const TopCountriesChart = ({
       </FullscreenOverlay>
     </>
   );
-};
+});
