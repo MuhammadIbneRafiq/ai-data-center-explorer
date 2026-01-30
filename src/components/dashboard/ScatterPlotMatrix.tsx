@@ -778,7 +778,7 @@ export const ScatterPlotMatrix = ({
       }
     }
     return cells;
-  }, [gridSize, activeAttributes, useLogScales, data.length, localBrushMode, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick, isLassoing, lassoCell, lassoPoints, isBrushingEnabled, handleLassoSelect, focusMode, getColorIndex, colorPalette, getPointColor, handleBrushSelect]);
+  }, [gridSize, activeAttributes, useLogScales, data.length, localBrushMode, highlightedCountries?.size, zoomLevel, selectedCell, registerCellRef, handleCellClick, isLassoing, lassoCell, lassoPoints, isBrushingEnabled, handleLassoSelect, focusMode, getColorIndex, colorPalette, getPointColor, handleBrushSelect, focusLens, getScatterData, matrixSize]);
 
   // Render normal scatter plot for 2x2
   const renderNormalScatter = useMemo(() => {
@@ -908,16 +908,27 @@ export const ScatterPlotMatrix = ({
               </Button>
             </div>
             <div className="flex items-center gap-1">
-              {/* Focus mode toggle */}
-              <Button
-                variant={focusMode ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFocusMode(!focusMode)}
-                className="h-6 text-xs px-2"
-                title="Focus Mode - Magnify and highlight selected points"
-              >
-                <Focus className="h-3 w-3 mr-1" />Focus
-              </Button>
+              {/* Brush mode toggle - Focus and Hover are the same */}
+              <div className="flex items-center border rounded overflow-hidden">
+                <Button
+                  variant={localBrushMode === "select" && !focusMode ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => { setLocalBrushMode("select"); setFocusMode(false); }}
+                  className="rounded-none px-2 h-6 text-xs"
+                  title="Select Mode - Drag to select points"
+                >
+                  Select
+                </Button>
+                <Button
+                  variant={localBrushMode === "hover" || focusMode ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => { setLocalBrushMode("hover"); setFocusMode(true); }}
+                  className="rounded-none px-2 h-6 text-xs"
+                  title="Focus/Hover Mode - Magnify and select on hover"
+                >
+                  <Focus className="h-3 w-3 mr-1" />Focus
+                </Button>
+              </div>
               
               {/* Log scale toggle */}
               <Button
